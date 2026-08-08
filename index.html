@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Songbook</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#063986">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Songbook">
+<style>
+  :root{
+    --dark:#26282c;
+    --navy:#1d3f72;
+    --blue:#2f6fdb;
+    --blue-dark:#1d3f72;
+    --bg:#ffffff;
+    --text:#1a1a1a;
+    --muted:#8a8f98;
+    --border:#e4e6ea;
+    --panel-bg:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);}
+  #app{height:100vh;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+
+  /* ---------- Header ---------- */
+  .app-header{
+    background:#063986;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    padding:0 14px;
+    height:54px;
+    flex:0 0 auto;
+    gap:10px;
+  }
+  .app-header .left-group{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+  .app-header .title{flex:2;text-align:center;font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .app-header .right-group{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:16px;}
+  .icon-btn{background:none;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:6px;border-radius:6px;opacity:.9;}
+  .icon-btn:hover{opacity:1;background:rgba(255,255,255,.08);}
+  .icon-btn svg{width:20px;height:20px;}
+  .key-control{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500;white-space:nowrap;}
+  .key-control button{background:none;border:1px solid rgba(255,255,255,.35);color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;}
+  .key-control button:hover{background:rgba(255,255,255,.15);}
+  .key-label{min-width:14px;text-align:center;opacity:.95;}
+
+  /* ---------- Song viewer ---------- */
+  .content-area{flex:1;overflow-y:auto;position:relative;}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);gap:14px;padding:40px;text-align:center;}
+  .empty-state button{background:var(--navy);color:#fff;border:none;padding:12px 22px;border-radius:24px;font-size:15px;cursor:pointer;}
+
+  .song-content{
+    columns: 300px 3;
+    column-gap: 48px;
+    column-rule: 1px solid var(--border);
+    padding: 30px 40px 60px;
+  }
+  .song-section{break-inside:avoid;margin-bottom:34px;}
+  .section-label{font-weight:800;font-size:16px;letter-spacing:.4px;margin-bottom:14px;text-transform:uppercase;}
+  .lyric-line{margin-bottom:6px;line-height:2.1;white-space:normal;}
+  .lyric-line.blank{height:14px;}
+  .chord-pair{display:inline-block;position:relative;padding-top:1.15em;vertical-align:bottom;}
+  .chord-pair .chord{position:absolute;top:0;left:0;color:var(--blue);font-weight:700;font-size:13px;white-space:nowrap;}
+  .chord-pair .lyric{white-space:pre;}
+  .lyric-only-line{white-space:pre-wrap;}
+
+  /* ---------- Edit screen ---------- */
+  .edit-meta{
+    display:flex;align-items:center;gap:20px;
+    padding:14px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;
+  }
+  .edit-meta .song-name-input{
+    border:none;font-size:20px;font-weight:500;flex:1.4;min-width:180px;outline:none;background:transparent;
+  }
+  .edit-meta select{
+    border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:14px;background:#fff;color:var(--text);
+  }
+  .edit-meta label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .edit-body{flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;}
+  .edit-body textarea{
+    flex:1;min-height:320px;width:100%;border:1px solid var(--border);border-radius:8px;padding:16px;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:14.5px;line-height:1.8;resize:vertical;outline:none;
+  }
+  .edit-hint{font-size:12.5px;color:var(--muted);background:#f6f7f9;border-radius:8px;padding:10px 14px;}
+  .edit-hint code{background:#eceff3;padding:1px 5px;border-radius:4px;}
+  .edit-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border);}
+  .edit-footer .left-actions label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);}
+  .edit-footer .right-actions{display:flex;gap:10px;}
+  .btn{border:none;border-radius:22px;padding:10px 20px;font-size:14.5px;cursor:pointer;font-weight:500;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:hover{background:#173257;}
+  .btn-secondary{background:#f0f1f3;color:var(--text);}
+  .btn-secondary:hover{background:#e5e7ea;}
+  .btn-danger{background:#fff;color:#c23b3b;border:1px solid #f0c9c9;}
+  .btn-danger:hover{background:#fdf2f2;}
+
+  /* ---------- Menu drawer ---------- */
+  .overlay{
+    position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:20;
+  }
+  .overlay.open{opacity:1;pointer-events:auto;}
+  .menu-drawer{
+    position:absolute;top:0;left:0;bottom:0;width:min(420px,88%);background:#fff;
+    transform:translateX(-100%);transition:transform .22s ease;z-index:21;
+    display:flex;flex-direction:column;box-shadow:2px 0 18px rgba(0,0,0,.15);
+  }
+  .menu-drawer.open{transform:translateX(0);}
+  .menu-header{background:#063986;color:#fff;padding:20px 20px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}
+  .menu-header h2{margin:0;font-size:22px;font-weight:800;letter-spacing:.5px;}
+  .menu-header button{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
+  .menu-body{flex:1;overflow-y:auto;padding:16px 20px 90px;}
+  .search-wrap{position:relative;margin-bottom:18px;}
+  .search-wrap input{
+    width:100%;padding:11px 38px 11px 16px;border-radius:22px;border:2px solid #cfd6e0;font-size:15px;outline:none;
+  }
+  .search-wrap input:focus{border-color:var(--text);}
+  .search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;color:var(--muted);cursor:pointer;}
+  .search-results-empty{color:var(--muted);font-size:14px;margin-bottom:10px;}
+  .menu-section{margin-bottom:26px;}
+  .menu-section-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--dark);padding-bottom:6px;margin-bottom:8px;}
+  .menu-section-head h3{margin:0;font-size:14px;font-weight:800;letter-spacing:.4px;color:var(--navy);text-transform:uppercase;}
+  .menu-section-head .add-link{color:var(--text);font-size:14px;font-weight:600;background:none;border:none;cursor:pointer;}
+  .menu-empty{color:var(--muted);font-size:14px;padding:6px 0;}
+  .menu-row{
+    display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f0f1f3;
+  }
+  .menu-row .idx{color:var(--muted);font-size:14px;width:16px;}
+  .menu-row .row-title{flex:1;color:var(--text);font-size:15.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .menu-row .row-title:hover{text-decoration:underline;}
+  .menu-row .key-badge{color:var(--muted);font-size:14px;width:18px;text-align:center;}
+  .menu-row .mini-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:3px;display:flex;}
+  .menu-row .mini-btn:hover{color:var(--text);}
+  .menu-row .mini-btn svg{width:14px;height:14px;}
+  .lib-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f3;cursor:pointer;}
+  .lib-row:hover .row-title{text-decoration:underline;}
+  .lib-row .row-title{color:var(--text);font-size:15.5px;}
+  .lib-row .key-badge{color:var(--muted);font-size:14px;}
+  .event-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f3;}
+  .event-row .ev-name{font-size:15px;}
+  .event-row .ev-date{color:var(--muted);font-size:13px;}
+  .new-song-btn{
+    position:absolute;left:20px;right:20px;bottom:18px;background:var(--navy);color:#fff;border:none;
+    padding:15px;border-radius:26px;font-size:16px;font-weight:700;letter-spacing:.3px;cursor:pointer;
+  }
+  .new-song-btn:hover{background:#173257;}
+  .picker-list{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px;}
+  .picker-list .picker-row{padding:9px 12px;cursor:pointer;font-size:14.5px;border-bottom:1px solid #f2f3f5;}
+  .picker-list .picker-row:hover{background:#f5f7fa;}
+  .picker-list .picker-row:last-child{border-bottom:none;}
+
+  /* modal */
+  .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:30;}
+  .modal{background:#fff;border-radius:12px;padding:22px;width:min(340px,88%);box-shadow:0 10px 40px rgba(0,0,0,.2);}
+  .modal h3{margin:0 0 14px;font-size:17px;}
+  .modal input,.modal select{width:100%;padding:9px 12px;border-radius:7px;border:1px solid var(--border);font-size:14.5px;margin-bottom:12px;outline:none;}
+  .modal .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
+
+  /* ---------- Gate / loading ---------- */
+  .loading-wrap{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px;}
+  .gate-wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:24px;background:#f7f8fa;}
+  .gate-card{max-width:380px;width:100%;text-align:center;}
+  .gate-card h1{font-size:26px;margin:0 0 6px;color:var(--dark);}
+  .gate-card p.sub{color:var(--muted);font-size:14.5px;margin:0 0 26px;line-height:1.5;}
+  .gate-options{display:flex;flex-direction:column;gap:12px;}
+  .gate-btn{padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:15px;text-align:left;}
+  .gate-btn strong{display:block;font-size:15.5px;margin-bottom:2px;color:var(--text);}
+  .gate-btn span{color:var(--muted);font-size:13px;}
+  .gate-btn:hover{border-color:var(--blue);}
+  .gate-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
+  .gate-form input{padding:12px 14px;border-radius:8px;border:1px solid var(--border);font-size:18px;letter-spacing:3px;text-transform:uppercase;text-align:center;}
+  .gate-error{color:#c23b3b;font-size:13.5px;}
+  .gate-code-display{font-size:30px;letter-spacing:5px;font-weight:800;color:var(--navy);background:#eef2f8;border-radius:10px;padding:18px;margin:18px 0;}
+  .gate-secret-display{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:13px;word-break:break-all;background:#eef2f8;border-radius:8px;padding:12px;margin:8px 0 18px;color:var(--navy);text-align:left;}
+  .field-label{font-size:13px;color:var(--muted);display:block;text-align:left;margin-bottom:4px;}
+  .role-badge{border-radius:8px;padding:10px 12px;font-size:13.5px;margin-bottom:16px;text-align:left;}
+  .role-badge.owner{background:#eaf7ec;color:#1c7c34;}
+  .role-badge.viewer{background:#f3f4f6;color:var(--muted);}
+  .full-btn{width:100%;padding:14px;}
+
+  @media (max-width:520px){
+    .song-content{columns:1;padding:20px;}
+    .app-header .title{font-size:15px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ============ SUPABASE CONFIG ============ */
+  var SUPABASE_URL = "https://hllolzzgmiqvrnnhywzs.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_F79FCrztcNQ28kaRjJWvfw_jhgTmQA1";
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  var CODE_STORAGE_KEY = "songbookSpaceCode";
+  function cacheKey(code){ return "songbookCache_" + code; }
+  function ownerSecretKey(code){ return "songbookOwnerSecret_" + code; }
+  function localKeysStorageKey(code){ return "songbookLocalKeys_" + code; }
+
+  // Storage can throw (Safari private mode, restricted webviews, opaque origins) —
+  // never let a storage failure take down the app; fall back to in-memory only.
+  function safeGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
+  function safeSet(key, val){ try{ localStorage.setItem(key, val); }catch(e){} }
+  function safeRemove(key){ try{ localStorage.removeItem(key); }catch(e){} }
+
+  var NOTES_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  var NOTES_FLAT  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+  var ALL_KEYS = NOTES_SHARP;
+
+  /* ============ APP STATE ============ */
+  var APP_STAGE = "loading"; // loading | gate | app
+  var GATESTATE = { mode:null, error:null, code:null, inputValue:"" };
+  var SPACE_CODE = null;
+  var OWNER_SECRET = null;
+  var CHANNEL = null;
+  var DB = null;
+  var UISTATE = { menuOpen:false, search:"", modal:null, editingId:null, columns:"auto", showOwnerUnlock:false, ownerKeyError:null, showChordImport:false };
+  function isOwner(){ return !!OWNER_SECRET; }
+
+  // Tracks the last-known value of the edit screen's content textarea so we can diff
+  // against it on every "input" event and detect a large chunk of pasted text — this
+  // works regardless of *how* the paste happened (Ctrl+V, right-click menu, mobile
+  // "Paste" bubble, drag-drop), unlike intercepting the "paste" event, whose
+  // clipboardData is unreliable across browsers/mobile webviews.
+  var EDIT_CONTENT_SNAPSHOT = null;
+
+  // Personal, device-only key overrides for viewers (never synced to Supabase).
+  // Owners always see/control the shared key directly, so this is ignored for them.
+  var LOCAL_KEYS = {};
+  function loadLocalKeys(code){
+    try{ var raw = safeGet(localKeysStorageKey(code)); return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; }
+  }
+  function saveLocalKeys(){
+    if(!SPACE_CODE) return;
+    safeSet(localKeysStorageKey(SPACE_CODE), JSON.stringify(LOCAL_KEYS));
+  }
+  function getDisplayKey(song){
+    if(isOwner()) return song.currentKey;
+    return (LOCAL_KEYS && LOCAL_KEYS[song.id]) || song.currentKey;
+  }
+
+  // Seed content for new songbooks now lives server-side in the create_space_with_seed
+  // Postgres function, so it can be inserted atomically alongside the owner secret.
+
+  /* ============ HELPERS ============ */
+  function escapeHtml(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  // Escapes text, then turns **text** into <strong>text</strong>. Escaping first keeps
+  // this safe against HTML injection while still letting the ** markers do their job.
+  function applyBold(s){
+    return escapeHtml(s).replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
+  }
+  function findSong(id){
+    if(!DB) return null;
+    for(var i=0;i<DB.songs.length;i++){ if(DB.songs[i].id===id) return DB.songs[i]; }
+    return null;
+  }
+  function generateCode(){
+    var alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1
+    var out = "";
+    for(var i=0;i<6;i++){ out += alphabet[Math.floor(Math.random()*alphabet.length)]; }
+    return out;
+  }
+  function rowToSong(row){
+    return {
+      id: row.id, title: row.title, originalKey: row.original_key, currentKey: row.current_key,
+      format: row.format, content: row.content, inProgress: row.in_progress
+    };
+  }
+  function rowToSetlistItem(row){
+    return { id: row.id, songId: row.song_id, position: row.position };
+  }
+  function rowToEvent(row){
+    return { id: row.id, name: row.name, date: row.event_date || "" };
+  }
+
+  /* ============ CHORD TRANSPOSE ============ */
+  function keyIndex(key){
+    var i = NOTES_SHARP.indexOf(key);
+    if(i>=0) return i;
+    i = NOTES_FLAT.indexOf(key);
+    return i>=0 ? i : 0;
+  }
+  function transposeChord(chord, semitones, useFlats){
+    if(semitones===0) return chord;
+    if(chord.indexOf("/")>-1){
+      var parts = chord.split("/");
+      return transposeChord(parts[0], semitones, useFlats) + "/" + transposeChord(parts[1], semitones, useFlats);
+    }
+    var m = chord.match(/^([A-G])(#|b)?(.*)$/);
+    if(!m) return chord;
+    var root = m[1] + (m[2]||"");
+    var suffix = m[3]||"";
+    var idx = keyIndex(root);
+    var newIdx = (idx + semitones + 1200) % 12;
+    var table = useFlats ? NOTES_FLAT : NOTES_SHARP;
+    return table[newIdx] + suffix;
+  }
+  function semitoneDiff(fromKey, toKey){
+    return keyIndex(toKey) - keyIndex(fromKey);
+  }
+
+  /* ============ CHORD SHEET IMPORT (chords-above-lyrics -> [Chord]lyric) ============ */
+  // Converts a classic "chord line above lyric line" sheet (the common copy/paste
+  // format for worship chord charts) into this app's inline [Chord]lyric markup,
+  // and turns ALL-CAPS label lines like "CORO:" into "## " section headers.
+  function isChordToken(tok){
+    return /^[A-G](#|b)?(maj7|maj|min7|min|dim7|dim|aug|sus2|sus4|sus|add9|add|m7|m|-)?[0-9]*(\/[A-G](#|b)?)?$/.test(tok);
+  }
+  function isChordLine(line){
+    var t = line.trim();
+    if(!t) return false;
+    var toks = t.split(/\s+/);
+    return toks.every(isChordToken);
+  }
+  function isLabelLine(line){
+    var t = line.trim();
+    if(!t) return false;
+    if(isChordLine(line)) return false;
+    return /^[A-ZÀ-Ý0-9][A-ZÀ-Ý0-9\s]*:$/.test(t);
+  }
+  // Finds the start of the word that column `col` falls inside (or on). If `col` lands
+  // exactly on whitespace (the gap between words — very common, since chord sheets are
+  // typically typed with the chord centered in the blank space before the syllable it
+  // belongs to), we skip forward past the whitespace to the start of the NEXT word.
+  // Snapping backward here would glue the chord to the end of the previous word instead
+  // (e.g. "POR[C] QUE" instead of the intended "POR [C]QUE").
+  function snapToWordStart(chars, col){
+    if(col <= 0) return 0;
+    if(col >= chars.length) return chars.length;
+    if(chars[col] === ' '){
+      var k = col;
+      while(k < chars.length && chars[k] === ' '){ k++; }
+      return k;
+    }
+    var j = col;
+    while(j > 0 && chars[j-1] !== ' '){ j--; }
+    return j;
+  }
+  function convertChordSheet(raw){
+    var lines = String(raw).replace(/\r\n/g, "\n").split("\n");
+    var out = [];
+    var i = 0;
+    while(i < lines.length){
+      var line = lines[i];
+      if(line.trim() === ""){ out.push(""); i++; continue; }
+      if(isLabelLine(line)){
+        out.push("## " + line.trim().replace(/:$/, ""));
+        i++; continue;
+      }
+      if(isChordLine(line)){
+        var chordMatches = [];
+        var re = /\S+/g, m, idx = 0;
+        while((m = re.exec(line))){ chordMatches.push({chord:m[0], col:m.index, idx:idx++}); }
+        var nextLine = lines[i+1];
+        var lyricAvailable = (i+1 < lines.length) && nextLine.trim() !== "" && !isChordLine(nextLine) && !isLabelLine(nextLine);
+        var lyricLine = lyricAvailable ? nextLine : "";
+        var chars = lyricLine.split("");
+        // Chord sheets are typed with the chord's character column roughly matching the
+        // lyric character column it sits above — the standard plain-text chord-sheet
+        // convention. Snap each chord's raw column to the nearest word start so it lands
+        // before a whole syllable rather than mid-word.
+        chordMatches.forEach(function(cm){
+          cm.col = snapToWordStart(chars, Math.min(cm.col, chars.length));
+        });
+        var sorted = chordMatches.slice().sort(function(a,b){
+          if(b.col !== a.col) return b.col - a.col;
+          return b.idx - a.idx;
+        });
+        sorted.forEach(function(cm){
+          var insertion = "[" + cm.chord + "]";
+          var pos = Math.min(cm.col, chars.length);
+          chars.splice(pos, 0, insertion);
+        });
+        out.push(chars.join(""));
+        i += lyricAvailable ? 2 : 1;
+        continue;
+      }
+      out.push(line);
+      i++;
+    }
+    return out.join("\n");
+  }
+  // Heuristic: does this pasted text look like a classic chords-above-lyrics sheet
+  // (as opposed to plain lyrics, or text already using this app's [Chord]lyric format)?
+  function looksLikeChordSheet(text){
+    if(/\[[A-G][^\]]*\]/.test(text)) return false; // already in bracket format
+    var lines = String(text).replace(/\r\n/g, "\n").split("\n");
+    var nonEmpty = lines.filter(function(l){ return l.trim() !== ""; });
+    if(nonEmpty.length < 2) return false;
+    var chordLineCount = nonEmpty.filter(isChordLine).length;
+    return chordLineCount >= 2 && (chordLineCount / nonEmpty.length) >= 0.3;
+  }
+  function commonPrefixLen(a, b){
+    var n = Math.min(a.length, b.length), i = 0;
+    while(i < n && a[i] === b[i]) i++;
+    return i;
+  }
+  function commonSuffixLen(a, b, maxLen){
+    var n = Math.min(a.length, b.length, maxLen);
+    var i = 0;
+    while(i < n && a[a.length-1-i] === b[b.length-1-i]) i++;
+    return i;
+  }
+  // Diffs the textarea's current value against the last snapshot to find what was just
+  // inserted (works for any insertion method: paste, drag-drop, IME, mobile "Paste" bubble).
+  // If that inserted chunk looks like a chord sheet, converts just that chunk in place.
+  function diffAndMaybeConvertContent(textarea){
+    var oldVal = EDIT_CONTENT_SNAPSHOT || "";
+    var newVal = textarea.value;
+    if(newVal === oldVal) return;
+    var prefixLen = commonPrefixLen(oldVal, newVal);
+    var maxSuffix = Math.min(oldVal.length - prefixLen, newVal.length - prefixLen);
+    var suffixLen = commonSuffixLen(oldVal, newVal, maxSuffix);
+    var inserted = newVal.substring(prefixLen, newVal.length - suffixLen);
+    if(inserted.length >= 12 && inserted.indexOf("\n") > -1 && looksLikeChordSheet(inserted)){
+      var converted = convertChordSheet(inserted);
+      var rebuilt = newVal.slice(0, prefixLen) + converted + newVal.slice(newVal.length - suffixLen);
+      var caret = prefixLen + converted.length;
+      textarea.value = rebuilt;
+      if(textarea.setSelectionRange){ textarea.setSelectionRange(caret, caret); }
+      EDIT_CONTENT_SNAPSHOT = rebuilt;
+      return;
+    }
+    EDIT_CONTENT_SNAPSHOT = newVal;
+  }
+
+  /* ============ BULK IMPORT ============ */
+  // Multi-song text format:
+  //   # Song Title
+  //   Key: G                      (optional, defaults to C)
+  //
+  //   [G]lyrics... (or a raw chords-above-lyrics sheet — either works)
+  //
+  //   ---                          (optional divider; a blank line + next "# Title" also works)
+  //
+  //   # Next Song Title
+  //   ...
+  // Slightly more lenient than looksLikeChordSheet: each bulk-import block is already an
+  // isolated song, so even a single chord line (e.g. a one-line bridge) should convert.
+  function looksLikeChordSheetLenient(text){
+    if(/\[[A-G][^\]]*\]/.test(text)) return false;
+    var lines = String(text).replace(/\r\n/g, "\n").split("\n");
+    var nonEmpty = lines.filter(function(l){ return l.trim() !== ""; });
+    if(nonEmpty.length < 2) return false;
+    var chordLineCount = nonEmpty.filter(isChordLine).length;
+    return chordLineCount >= 1 && (chordLineCount / nonEmpty.length) >= 0.2;
+  }
+  function normalizeKeyInput(raw){
+    if(!raw) return "C";
+    var k = String(raw).trim();
+    if(!k) return "C";
+    k = k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
+    if(NOTES_SHARP.indexOf(k) > -1) return k;
+    if(NOTES_FLAT.indexOf(k) > -1) return k;
+    return "C";
+  }
+  function parseBulkSongs(raw){
+    var lines = String(raw).replace(/\r\n/g, "\n").split("\n");
+    var blocks = [];
+    var current = null;
+    lines.forEach(function(line){
+      var titleMatch = line.match(/^#\s+(.+?)\s*$/); // single "# " header; "## " (sections) won't match
+      if(titleMatch){
+        if(current) blocks.push(current);
+        current = { title: titleMatch[1], key: null, contentLines: [] };
+        return;
+      }
+      if(!current) return; // ignore any preamble before the first "# Title"
+      if(current.key === null && current.contentLines.length === 0){
+        var keyMatch = line.match(/^Key:\s*([A-Ga-g](#|b)?)\s*$/);
+        if(keyMatch){ current.key = keyMatch[1]; return; }
+      }
+      if(/^-{3,}\s*$/.test(line.trim())) return; // divider line between songs
+      current.contentLines.push(line);
+    });
+    if(current) blocks.push(current);
+
+    return blocks.map(function(b){
+      var contentLines = b.contentLines.slice();
+      while(contentLines.length && contentLines[0].trim() === "") contentLines.shift();
+      while(contentLines.length && contentLines[contentLines.length-1].trim() === "") contentLines.pop();
+      var content = contentLines.join("\n");
+      if(looksLikeChordSheetLenient(content)){ content = convertChordSheet(content); }
+      var key = normalizeKeyInput(b.key);
+      return {
+        title: b.title.trim() || "Untitled Song",
+        originalKey: key,
+        content: content
+      };
+    }).filter(function(s){ return s.title; });
+  }
+  function doBulkImportFromText(raw){
+    if(!isOwner()){
+      UISTATE.modal = { type:"bulk", error:"This device doesn't have edit access, so it can't import songs. Unlock editing in Settings first.", text: raw };
+      render();
+      return;
+    }
+    var songs = parseBulkSongs(raw);
+    if(!songs.length){
+      UISTATE.modal = { type:"bulk", error:'No songs found. Make sure each song starts with a line like "# Song Title".', text: raw };
+      render();
+      return;
+    }
+    UISTATE.modal = { type:"bulk", error:null, text: raw, importing:true, total: songs.length };
+    render();
+    var creates = songs.map(function(s){
+      return Promise.resolve(sb.rpc("create_song", {
+        p_space_id: SPACE_CODE, p_secret: OWNER_SECRET, p_title: s.title, p_original_key: s.originalKey,
+        p_format: "chords", p_content: s.content, p_in_progress: true
+      })).catch(function(e){ return { error: e }; }); // normalize network-level throws into the same {error} shape
+    });
+    Promise.all(creates).then(function(results){
+      var successCount = 0, failCount = 0;
+      results.forEach(function(res){
+        if(!res || res.error){ failCount++; if(res) console.error(res.error); return; }
+        var row = rowToSong(res.data);
+        if(!findSong(row.id)){ DB.songs.push(row); }
+        successCount++;
+      });
+      var msg = "Added " + successCount + " song" + (successCount===1?"":"s") + " to New Songs in Progress.";
+      if(failCount) msg += " " + failCount + " failed — check your connection and try again.";
+      // Stay open and show the result in the modal itself rather than relying on alert(),
+      // which is silently blocked in some browsers/webviews and gives no feedback at all.
+      UISTATE.modal = { type:"bulk", error:null, text:"", done:true, resultMsg: msg };
+      render();
+    }).catch(function(e){
+      console.error("bulk import failed", e);
+      UISTATE.modal = { type:"bulk", error:"Something went wrong during import. Please try again.", text: raw };
+      render();
+    });
+  }
+
+  /* ============ RENDER: SONG CONTENT ============ */
+  function parseAndRenderContent(song, displayKey){
+    var semis = semitoneDiff(song.originalKey, displayKey);
+    var useFlats = displayKey.indexOf("b") > -1;
+    var lines = song.content.split("\n");
+    var html = "";
+    var sectionOpen = false;
+
+    lines.forEach(function(line){
+      if(/^##\s+/.test(line)){
+        if(sectionOpen) html += "</div>";
+        var label = line.replace(/^##\s+/,"");
+        html += '<div class="song-section"><div class="section-label">'+escapeHtml(label)+'</div>';
+        sectionOpen = true;
+        return;
+      }
+      if(!sectionOpen){ html += '<div class="song-section">'; sectionOpen = true; }
+      if(line.trim()===""){
+        html += '<div class="lyric-line blank"></div>';
+        return;
+      }
+      if(song.format === "lyrics"){
+        var plain = line.replace(/\[([^\]]+)\]/g,"");
+        html += '<div class="lyric-line lyric-only-line">'+applyBold(plain)+'</div>';
+        return;
+      }
+      var tokens = line.split(/\[([^\]]+)\]/);
+      var row = '<div class="lyric-line">';
+      if(tokens[0]){
+        row += '<span class="chord-pair"><span class="lyric">'+applyBold(tokens[0])+'</span></span>';
+      }
+      for(var i=1;i<tokens.length;i+=2){
+        var chord = tokens[i];
+        var lyric = tokens[i+1] || "";
+        var newChord = transposeChord(chord, semis, useFlats);
+        row += '<span class="chord-pair"><span class="chord">'+escapeHtml(newChord)+'</span><span class="lyric">'+applyBold(lyric || " ")+'</span></span>';
+      }
+      row += '</div>';
+      html += row;
+    });
+    if(sectionOpen) html += "</div>";
+    return html;
+  }
+
+  /* ============ ICONS ============ */
+  var ICONS = {
+    menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
+    edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="16" rx="1"/><line x1="6" y1="8" x2="14" y2="8"/><line x1="6" y1="12" x2="11" y2="12"/><path d="M14 15 L21 8 L23 10 L16 17 L13 18 Z"/></svg>',
+    gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    up:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 6l7 10H5z"/></svg>',
+    down:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 18L5 8h14z"/></svg>',
+    x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>'
+  };
+
+  /* ============ RENDER: GATE / LOADING ============ */
+  function loadingHtml(){
+    return '<div class="loading-wrap">Loading your songbook&hellip;</div>';
+  }
+
+  function renderGate(){
+    var g = GATESTATE;
+    if(g.mode === "created"){
+      return '<div class="gate-wrap"><div class="gate-card">'+
+        '<h1>Songbook created</h1>'+
+        '<p class="sub">There are two codes below — they do different things. Save both somewhere safe; neither can be recovered if lost.</p>'+
+        '<span class="field-label">Access code — share freely, lets anyone view</span>'+
+        '<div class="gate-code-display">'+escapeHtml(g.code)+'</div>'+
+        '<span class="field-label">Owner key — keep private, grants edit access</span>'+
+        '<div class="gate-secret-display">'+escapeHtml(g.secret)+'</div>'+
+        '<button class="btn btn-secondary full-btn" data-action="copy-owner-key" style="margin-bottom:10px;">Copy owner key</button>'+
+        '<button class="btn btn-primary full-btn" data-action="gate-continue">Continue to Songbook</button>'+
+      '</div></div>';
+    }
+    if(g.mode === "join"){
+      return '<div class="gate-wrap"><div class="gate-card">'+
+        '<h1>Join a songbook</h1>'+
+        '<p class="sub">Enter the access code shared with you.</p>'+
+        '<div class="gate-form">'+
+          '<input id="join-code-input" maxlength="8" placeholder="e.g. 7F3K9Q" value="'+escapeHtml(g.inputValue||"")+'">'+
+          (g.error ? '<div class="gate-error">'+escapeHtml(g.error)+'</div>' : '')+
+          '<button class="btn btn-primary full-btn" data-action="gate-join-submit">Join</button>'+
+          '<button class="btn btn-secondary full-btn" data-action="gate-back">Back</button>'+
+        '</div>'+
+      '</div></div>';
+    }
+    return '<div class="gate-wrap"><div class="gate-card">'+
+      '<h1>Songbook</h1>'+
+      '<p class="sub">Keep your set lists and songs in sync across every device.</p>'+
+      '<div class="gate-options">'+
+        '<button class="gate-btn" data-action="gate-create"><strong>Create a new songbook</strong><span>Start fresh and get a code to share</span></button>'+
+        '<button class="gate-btn" data-action="gate-show-join"><strong>Join with a code</strong><span>Sync to a songbook someone else created</span></button>'+
+      '</div>'+
+    '</div></div>';
+  }
+
+  /* ============ RENDER: HEADER ============ */
+  function renderHeader(){
+    var song = findSong(DB.ui.currentSongId);
+    var view = DB.ui.view;
+    if(view === "edit"){
+      return '<div class="app-header">'+
+        '<div class="left-group"><button class="icon-btn" data-action="open-menu">'+ICONS.menu+'</button></div>'+
+        '<div class="title">Edit Song</div>'+
+        '<div class="right-group">'+
+          '<button class="icon-btn" data-action="save-song" title="Save">'+ICONS.edit+'</button>'+
+        '</div>'+
+      '</div>';
+    }
+    var key = song ? getDisplayKey(song) : "";
+    var keyTitle = isOwner() ? "" : ' title="Transpose for your view only"';
+    return '<div class="app-header">'+
+      '<div class="left-group">'+
+        '<button class="icon-btn" data-action="open-menu">'+ICONS.menu+'</button>'+
+        (song ? (
+          '<div class="key-control"'+keyTitle+'>'+
+            '<button data-action="key-down">&minus;</button>'+
+            '<span class="key-label">'+key+'</span>'+
+            '<button data-action="key-up">&plus;</button>'+
+          '</div>'
+        ) : '') +
+      '</div>'+
+      '<div class="title">'+(song ? escapeHtml(song.title) : "Songbook")+'</div>'+
+      '<div class="right-group">'+
+        (song && isOwner() ? '<button class="icon-btn" data-action="edit-current" title="Edit">'+ICONS.edit+'</button>' : '')+
+        '<button class="icon-btn" data-action="open-settings" title="Settings">'+ICONS.gear+'</button>'+
+      '</div>'+
+    '</div>';
+  }
+
+  /* ============ RENDER: SONG VIEW BODY ============ */
+  function renderSongView(){
+    var song = findSong(DB.ui.currentSongId);
+    if(!song){
+      return '<div class="content-area"><div class="empty-state">'+
+        '<div>No song selected yet.</div>'+
+        (isOwner() ? '<button data-action="new-song">+ New Song</button>' : '')+
+      '</div></div>';
+    }
+    return '<div class="content-area"><div class="song-content">'+
+      parseAndRenderContent(song, getDisplayKey(song))+
+    '</div></div>';
+  }
+
+  /* ============ RENDER: EDIT VIEW ============ */
+  function renderEditView(){
+    var song = findSong(UISTATE.editingId) || findSong(DB.ui.currentSongId);
+    if(!song) return '<div class="content-area"></div>';
+    var keyOptions = ALL_KEYS.map(function(k){
+      return '<option value="'+k+'"'+(k===song.originalKey?" selected":"")+'>'+k+'</option>';
+    }).join("");
+    return '<div class="content-area" style="display:flex;flex-direction:column;height:100%;">'+
+      '<div class="edit-meta">'+
+        '<input class="song-name-input" data-field="title" value="'+escapeHtml(song.title)+'" placeholder="Song name">'+
+        '<select data-field="format">'+
+          '<option value="chords"'+(song.format==="chords"?" selected":"")+'>Chord over Lyrics</option>'+
+          '<option value="lyrics"'+(song.format==="lyrics"?" selected":"")+'>Lyrics Only</option>'+
+        '</select>'+
+        '<label>Original key '+
+          '<select data-field="originalKey">'+keyOptions+'</select>'+
+        '</label>'+
+      '</div>'+
+      '<div class="edit-body">'+
+        '<div class="edit-hint">Start a line with <code>## </code> for a section title (e.g. <code>## Verse 1</code>). Put chords in brackets right before the syllable, like <code>[G]Amazing [C]grace</code>. Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>. '+
+          '<button type="button" class="add-link" data-action="toggle-chord-import" style="border:none;background:none;color:var(--blue);font-weight:600;cursor:pointer;padding:0;font-size:12.5px;">'+(UISTATE.showChordImport ? "Hide chord-sheet paste" : "Paste a chord sheet instead")+'</button>'+
+        '</div>'+
+        (UISTATE.showChordImport ? (
+          '<div class="edit-hint" style="background:#eef2f8;">'+
+            'Paste a normal chord sheet below (chords on their own line above the lyrics, like <code>G&nbsp;&nbsp;&nbsp;&nbsp;C</code> over <code>Amazing grace</code>) and we\'ll convert it to this song\'s format.'+
+          '</div>'+
+          '<textarea id="chord-import-input" spellcheck="false" placeholder="Paste your chord sheet here..." style="min-height:160px;"></textarea>'+
+          '<div style="display:flex;gap:10px;">'+
+            '<button class="btn btn-primary" data-action="convert-chord-sheet">Convert &amp; Insert</button>'+
+            '<button class="btn btn-secondary" data-action="toggle-chord-import">Cancel</button>'+
+          '</div>'
+        ) : '')+
+        '<textarea data-field="content" spellcheck="false">'+escapeHtml(song.content)+'</textarea>'+
+      '</div>'+
+      '<div class="edit-footer">'+
+        '<div class="left-actions"><label><input type="checkbox" data-field="inProgress"'+(song.inProgress?" checked":"")+'> Mark as in progress</label></div>'+
+        '<div class="right-actions">'+
+          '<button class="btn btn-danger" data-action="delete-song">Delete</button>'+
+          '<button class="btn btn-secondary" data-action="cancel-edit">Cancel</button>'+
+          '<button class="btn btn-primary" data-action="save-song">Save</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  /* ============ RENDER: MENU DRAWER ============ */
+  function matchesSearch(song){
+    if(!UISTATE.search.trim()) return false;
+    return song.title.toLowerCase().indexOf(UISTATE.search.trim().toLowerCase()) > -1;
+  }
+
+  function renderMenu(){
+    var q = UISTATE.search.trim();
+    var results = q ? DB.songs.filter(matchesSearch) : [];
+
+    var setlistRows = DB.setlist.items.map(function(item, idx){
+      var s = findSong(item.songId);
+      if(!s) return "";
+      return '<div class="menu-row">'+
+        '<span class="idx">'+(idx+1)+'.</span>'+
+        '<span class="row-title" data-action="open-song" data-id="'+s.id+'">'+escapeHtml(s.title)+'</span>'+
+        '<span class="key-badge">'+s.currentKey+'</span>'+
+        (isOwner() ? (
+          '<button class="mini-btn" data-action="setlist-up" data-idx="'+idx+'">'+ICONS.up+'</button>'+
+          '<button class="mini-btn" data-action="setlist-down" data-idx="'+idx+'">'+ICONS.down+'</button>'+
+          '<button class="mini-btn" data-action="setlist-remove" data-idx="'+idx+'">'+ICONS.x+'</button>'
+        ) : '')+
+      '</div>';
+    }).join("");
+
+    var inProgressSongs = DB.songs.filter(function(s){ return s.inProgress; });
+    var inProgressRows = inProgressSongs.map(function(s, idx){
+      return '<div class="menu-row">'+
+        '<span class="idx">'+(idx+1)+'.</span>'+
+        '<span class="row-title" data-action="open-song" data-id="'+s.id+'">'+escapeHtml(s.title)+'</span>'+
+        '<span class="key-badge">'+s.currentKey+'</span>'+
+        (isOwner() ? '<button class="mini-btn" data-action="remove-in-progress" data-id="'+s.id+'">'+ICONS.x+'</button>' : '')+
+      '</div>';
+    }).join("");
+
+    var eventRows = DB.events.map(function(ev, idx){
+      return '<div class="event-row">'+
+        '<span class="ev-name">'+escapeHtml(ev.name)+'</span>'+
+        '<span class="ev-date">'+escapeHtml(ev.date||"")+'</span>'+
+        (isOwner() ? '<button class="mini-btn" data-action="remove-event" data-idx="'+idx+'">'+ICONS.x+'</button>' : '')+
+      '</div>';
+    }).join("");
+
+    var libRows = DB.songs.slice().sort(function(a,b){return a.title.localeCompare(b.title);}).map(function(s){
+      return '<div class="lib-row" data-action="open-song" data-id="'+s.id+'">'+
+        '<span class="row-title">'+escapeHtml(s.title)+'</span>'+
+        '<span class="key-badge">'+s.currentKey+'</span>'+
+      '</div>';
+    }).join("");
+
+    return '<div class="overlay'+(UISTATE.menuOpen?" open":"")+'" data-action="close-menu"></div>'+
+    '<div class="menu-drawer'+(UISTATE.menuOpen?" open":"")+'">'+
+      '<div class="menu-header"><h2>MENU</h2><button data-action="close-menu">&times;</button></div>'+
+      '<div class="menu-body">'+
+        '<div class="search-wrap">'+
+          '<input type="text" placeholder="Search songs" value="'+escapeHtml(UISTATE.search)+'" data-action="search-input">'+
+          (q ? '<button class="search-clear" data-action="search-clear">&times;</button>' : '')+
+        '</div>'+
+        (q ? (
+          '<div class="menu-section">'+
+            '<div class="menu-section-head"><h3>Search Results</h3></div>'+
+            (results.length ? results.map(function(s){
+              return '<div class="lib-row" data-action="open-song" data-id="'+s.id+'"><span class="row-title">'+escapeHtml(s.title)+'</span><span class="key-badge">'+s.currentKey+'</span></div>';
+            }).join("") : '<div class="search-results-empty">No songs found.</div>')+
+          '</div>'
+        ) : '')+
+        '<div class="menu-section">'+
+          '<div class="menu-section-head"><h3>'+escapeHtml(DB.setlist.name)+'</h3>'+(isOwner() ? '<button class="add-link" data-action="open-picker-setlist">+ Add</button>' : '')+'</div>'+
+          (setlistRows || '<div class="menu-empty">No songs added yet.</div>')+
+        '</div>'+
+        '<div class="menu-section">'+
+          '<div class="menu-section-head"><h3>New Songs in Progress</h3>'+(isOwner() ? '<button class="add-link" data-action="open-picker-progress">+ Add</button>' : '')+'</div>'+
+          (inProgressRows || '<div class="menu-empty">No songs in progress.</div>')+
+        '</div>'+
+        '<div class="menu-section">'+
+          '<div class="menu-section-head"><h3>Coming Up Events</h3>'+(isOwner() ? '<button class="add-link" data-action="open-add-event">+ Add</button>' : '')+'</div>'+
+          (eventRows || '<div class="menu-empty">No upcoming events.</div>')+
+        '</div>'+
+        '<div class="menu-section">'+
+          '<div class="menu-section-head"><h3>Song Library</h3><span style="display:flex;align-items:center;gap:10px;">'+(isOwner() ? '<button class="add-link" data-action="open-bulk-import">Bulk import</button>' : '')+'<span style="font-size:13px;color:var(--muted);">'+DB.songs.length+' songs</span></span></div>'+
+          (libRows || '<div class="menu-empty">Library is empty.</div>')+
+        '</div>'+
+      '</div>'+
+      (isOwner() ? '<button class="new-song-btn" data-action="new-song">+ New Song</button>' : '')+
+    '</div>';
+  }
+
+  /* ============ MODALS ============ */
+  function renderModal(){
+    if(!UISTATE.modal) return "";
+    var m = UISTATE.modal;
+    if(m.type === "picker"){
+      var target = m.target;
+      var pool = DB.songs.filter(function(s){
+        if(target==="setlist") return !DB.setlist.items.some(function(it){return it.songId===s.id;});
+        return !s.inProgress;
+      });
+      return '<div class="modal-backdrop" data-action="close-modal">'+
+        '<div class="modal" data-stop="1">'+
+          '<h3>Add a song</h3>'+
+          '<div class="picker-list">'+
+            (pool.length ? pool.map(function(s){
+              return '<div class="picker-row" data-action="pick-song" data-target="'+target+'" data-id="'+s.id+'">'+escapeHtml(s.title)+'</div>';
+            }).join("") : '<div class="picker-row" style="color:var(--muted);cursor:default;">No songs available</div>')+
+          '</div>'+
+          '<div class="modal-actions"><button class="btn btn-secondary" data-action="close-modal">Close</button></div>'+
+        '</div>'+
+      '</div>';
+    }
+    if(m.type === "event"){
+      return '<div class="modal-backdrop" data-action="close-modal">'+
+        '<div class="modal" data-stop="1">'+
+          '<h3>Add event</h3>'+
+          '<input type="text" id="ev-name" placeholder="Event name">'+
+          '<input type="date" id="ev-date">'+
+          '<div class="modal-actions">'+
+            '<button class="btn btn-secondary" data-action="close-modal">Cancel</button>'+
+            '<button class="btn btn-primary" data-action="save-event">Add</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }
+    if(m.type === "bulk"){
+      if(m.done){
+        return '<div class="modal-backdrop" data-action="close-modal">'+
+          '<div class="modal" data-stop="1" style="width:min(480px,92%);">'+
+            '<h3>Import complete</h3>'+
+            '<div class="role-badge owner" style="margin-bottom:16px;">'+escapeHtml(m.resultMsg||"")+'</div>'+
+            '<div class="modal-actions"><button class="btn btn-primary" data-action="close-modal">Done</button></div>'+
+          '</div>'+
+        '</div>';
+      }
+      return '<div class="modal-backdrop" data-action="close-modal">'+
+        '<div class="modal" data-stop="1" style="width:min(560px,92%);">'+
+          '<h3>Bulk import songs</h3>'+
+          '<div class="edit-hint" style="margin-bottom:12px;">'+
+            'Upload a .txt file or paste multiple songs below. Start each song with <code># Song Title</code>, optionally followed by <code>Key: G</code>, then the lyrics — either <code>[G]bracket</code> format or a plain chords-above-lyrics sheet both work. Separate songs with a blank line or a <code>---</code> divider.'+
+          '</div>'+
+          (m.error ? '<div class="gate-error" style="margin-bottom:10px;">'+escapeHtml(m.error)+'</div>' : '')+
+          '<input type="file" id="bulk-file-input" accept=".txt,.md,text/plain" style="margin-bottom:10px;display:block;font-size:13.5px;">'+
+          '<textarea id="bulk-import-input" spellcheck="false" placeholder="# Amazing Grace\nKey: G\n\n[G]Amazing [C]grace how [G]sweet the sound\n\n---\n\n# Another Song\nKey: D\n\nD              G\nChords above the lyrics also works" style="min-height:240px;">'+(m.text ? escapeHtml(m.text) : "")+'</textarea>'+
+          '<div class="modal-actions">'+
+            '<button class="btn btn-secondary" data-action="close-modal">Cancel</button>'+
+            '<button class="btn btn-primary" data-action="run-bulk-import"'+(m.importing ? " disabled" : "")+'>'+(m.importing ? ("Importing " + (m.total||"") + " songs…") : "Import songs")+'</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }
+    if(m.type === "settings"){
+      var ownerSection;
+      if(isOwner()){
+        ownerSection = '<button class="btn btn-secondary full-btn" data-action="copy-owner-key" style="margin-bottom:16px;">Copy owner key (to unlock another device)</button>';
+      } else if(UISTATE.showOwnerUnlock){
+        ownerSection = '<div style="margin-bottom:16px;">'+
+            '<span class="field-label">Owner key</span>'+
+            '<input id="owner-key-input" placeholder="Paste owner key" style="width:100%;padding:9px 12px;border-radius:7px;border:1px solid var(--border);font-size:13.5px;margin-bottom:8px;">'+
+            (UISTATE.ownerKeyError ? '<div class="gate-error" style="margin-bottom:8px;">'+escapeHtml(UISTATE.ownerKeyError)+'</div>' : '')+
+            '<button class="btn btn-primary full-btn" data-action="submit-owner-key">Unlock editing</button>'+
+          '</div>';
+      } else {
+        ownerSection = '<button class="btn btn-secondary full-btn" data-action="toggle-owner-unlock" style="margin-bottom:16px;">Have an owner key? Unlock editing</button>';
+      }
+      return '<div class="modal-backdrop" data-action="close-modal">'+
+        '<div class="modal" data-stop="1">'+
+          '<h3>Settings</h3>'+
+          (isOwner()
+            ? '<div class="role-badge owner">You have <strong>edit access</strong> on this device.</div>'
+            : '<div class="role-badge viewer">You have <strong>read-only</strong> access on this device.</div>')+
+          '<label style="font-size:13px;color:var(--muted);">Access code</label>'+
+          '<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">'+
+            '<div style="flex:1;font-weight:800;letter-spacing:2px;font-size:16px;border:1px solid var(--border);border-radius:7px;padding:9px 12px;">'+escapeHtml(SPACE_CODE||"")+'</div>'+
+            '<button class="btn btn-secondary" data-action="copy-code" style="padding:9px 14px;">Copy</button>'+
+          '</div>'+
+          ownerSection+
+          '<label style="font-size:13px;color:var(--muted);">Columns</label>'+
+          '<select id="set-columns">'+
+            '<option value="auto"'+(UISTATE.columns!=="1"?" selected":"")+'>Auto</option>'+
+            '<option value="1"'+(UISTATE.columns==="1"?" selected":"")+'>Single column</option>'+
+          '</select>'+
+          '<div class="modal-actions" style="justify-content:space-between;">'+
+            '<button class="btn btn-danger" data-action="switch-songbook">Switch songbook</button>'+
+            '<button class="btn btn-primary" data-action="close-modal">Done</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }
+    return "";
+  }
+
+  /* ============ MAIN RENDER ============ */
+  function render(){
+    var app = document.getElementById("app");
+    if(APP_STAGE === "loading"){ app.innerHTML = loadingHtml(); return; }
+    if(APP_STAGE === "gate"){ app.innerHTML = renderGate(); return; }
+    var body = DB.ui.view === "edit" ? renderEditView() : renderSongView();
+    app.innerHTML = renderHeader() + body + renderMenu() + renderModal();
+    applyColumnSetting();
+    if(SPACE_CODE && DB){
+      safeSet(cacheKey(SPACE_CODE), JSON.stringify(DB));
+    }
+  }
+
+  function applyColumnSetting(){
+    var el = document.querySelector(".song-content");
+    if(el && UISTATE.columns === "1"){ el.style.columns = "1"; }
+  }
+
+  /* ============ SPACE / SYNC ============ */
+  function subscribeRealtime(code){
+    if(CHANNEL){ try{ sb.removeChannel(CHANNEL); }catch(e){} CHANNEL = null; }
+    CHANNEL = sb.channel("space-"+code)
+      .on("postgres_changes", {event:"*", schema:"public", table:"songs", filter:"space_id=eq."+code}, handleSongChange)
+      .on("postgres_changes", {event:"*", schema:"public", table:"setlists", filter:"space_id=eq."+code}, handleSetlistChange)
+      .on("postgres_changes", {event:"*", schema:"public", table:"setlist_items", filter:"space_id=eq."+code}, handleSetlistItemChange)
+      .on("postgres_changes", {event:"*", schema:"public", table:"events", filter:"space_id=eq."+code}, handleEventChange)
+      .subscribe();
+  }
+
+  function handleSongChange(payload){
+    if(!DB) return;
+    if(payload.eventType === "INSERT"){
+      if(!findSong(payload.new.id)){
+        DB.songs.push(rowToSong(payload.new));
+        if(!DB.ui.currentSongId) DB.ui.currentSongId = payload.new.id;
+        render();
+      }
+    } else if(payload.eventType === "UPDATE"){
+      var s = findSong(payload.new.id);
+      if(s){
+        if(DB.ui.view === "edit" && UISTATE.editingId === s.id){ return; } // avoid clobbering an active edit
+        var updated = rowToSong(payload.new);
+        for(var k in updated){ s[k] = updated[k]; }
+        render();
+      }
+    } else if(payload.eventType === "DELETE"){
+      var id = payload.old.id;
+      DB.songs = DB.songs.filter(function(x){return x.id!==id;});
+      DB.setlist.items = DB.setlist.items.filter(function(it){return it.songId!==id;});
+      if(DB.ui.currentSongId === id){
+        DB.ui.currentSongId = DB.songs.length ? DB.songs[0].id : null;
+        if(DB.ui.view === "edit") DB.ui.view = "song";
+      }
+      render();
+    }
+  }
+
+  function handleSetlistChange(payload){
+    if(!DB || !DB.setlist) return;
+    if(payload.eventType === "UPDATE" && payload.new.id === DB.setlist.id){
+      DB.setlist.name = payload.new.name;
+      render();
+    }
+  }
+
+  function handleSetlistItemChange(payload){
+    if(!DB || !DB.setlist) return;
+    if(payload.eventType === "INSERT"){
+      if(!DB.setlist.items.some(function(it){return it.id===payload.new.id;})){
+        DB.setlist.items.push(rowToSetlistItem(payload.new));
+        DB.setlist.items.sort(function(a,b){return a.position-b.position;});
+        render();
+      }
+    } else if(payload.eventType === "UPDATE"){
+      var it = DB.setlist.items.find(function(x){return x.id===payload.new.id;});
+      if(it){
+        it.position = payload.new.position;
+        DB.setlist.items.sort(function(a,b){return a.position-b.position;});
+        render();
+      }
+    } else if(payload.eventType === "DELETE"){
+      DB.setlist.items = DB.setlist.items.filter(function(x){return x.id!==payload.old.id;});
+      render();
+    }
+  }
+
+  function handleEventChange(payload){
+    if(!DB) return;
+    if(payload.eventType === "INSERT"){
+      if(!DB.events.some(function(e){return e.id===payload.new.id;})){
+        DB.events.push(rowToEvent(payload.new));
+        DB.events.sort(function(a,b){return (a.date||"").localeCompare(b.date||"");});
+        render();
+      }
+    } else if(payload.eventType === "UPDATE"){
+      var ev = DB.events.find(function(x){return x.id===payload.new.id;});
+      if(ev){ var u = rowToEvent(payload.new); ev.name=u.name; ev.date=u.date; render(); }
+    } else if(payload.eventType === "DELETE"){
+      DB.events = DB.events.filter(function(x){return x.id!==payload.old.id;});
+      render();
+    }
+  }
+
+  // Loads (or refreshes) a space's data. enterApp=false keeps APP_STAGE at "gate" (used for the post-create confirmation screen).
+  function tryLoadSpace(code, enterApp){
+    if(enterApp === undefined) enterApp = true;
+    return sb.from("spaces").select("id").eq("id", code).maybeSingle().then(function(spaceRes){
+      if(spaceRes.error || !spaceRes.data) return false;
+      SPACE_CODE = code;
+      OWNER_SECRET = safeGet(ownerSecretKey(code));
+      LOCAL_KEYS = loadLocalKeys(code);
+      UISTATE.showOwnerUnlock = false;
+      UISTATE.ownerKeyError = null;
+      return Promise.all([
+        sb.from("songs").select("*").eq("space_id", code).order("title"),
+        sb.from("setlists").select("*").eq("space_id", code).limit(1),
+        sb.from("events").select("*").eq("space_id", code).order("event_date", {ascending:true})
+      ]).then(function(results){
+        var songsRes = results[0], setlistsRes = results[1], eventsRes = results[2];
+        DB = {
+          songs: (songsRes.data||[]).map(rowToSong),
+          setlist: null,
+          events: (eventsRes.data||[]).map(rowToEvent),
+          ui: { currentSongId: null, view: "song" }
+        };
+        var setlistRow = (setlistsRes.data && setlistsRes.data[0]) || null;
+        var ensureSetlist = setlistRow
+          ? Promise.resolve(setlistRow)
+          : sb.from("setlists").insert({space_id:code, name:"Sunday Set List"}).select().single().then(function(r){ return r.data; });
+        return ensureSetlist.then(function(sl){
+          return sb.from("setlist_items").select("*").eq("setlist_id", sl.id).order("position").then(function(itemsRes){
+            DB.setlist = { id: sl.id, name: sl.name, items: (itemsRes.data||[]).map(rowToSetlistItem) };
+            DB.ui.currentSongId = DB.songs.length ? DB.songs[0].id : null;
+            safeSet(CODE_STORAGE_KEY, code);
+            subscribeRealtime(code);
+            if(enterApp){ APP_STAGE = "app"; }
+            render();
+            return true;
+          });
+        });
+      });
+    }).catch(function(e){
+      console.error("tryLoadSpace failed", e);
+      return false;
+    });
+  }
+
+  function doCreateSpace(){
+    APP_STAGE = "loading"; render();
+    var code = generateCode();
+    sb.from("spaces").select("id").eq("id", code).maybeSingle().then(function(check){
+      if(check.data){ code = generateCode(); } // extremely unlikely collision; good enough for one retry
+      return sb.rpc("create_space_with_seed", {p_id: code});
+    }).then(function(res){
+      if(res.error) throw res.error;
+      var secret = res.data;
+      OWNER_SECRET = secret;
+      safeSet(ownerSecretKey(code), secret);
+      return tryLoadSpace(code, false).then(function(ok){ return {ok:ok, secret:secret}; });
+    }).then(function(result){
+      // tryLoadSpace re-reads the owner secret from storage; if that write silently failed
+      // (e.g. Safari private mode) force the freshly-created secret back so the creator
+      // isn't downgraded to read-only immediately after making their own songbook.
+      OWNER_SECRET = result.secret;
+      if(result.ok){
+        GATESTATE = { mode:"created", code:code, secret:result.secret, error:null };
+        APP_STAGE = "gate";
+      } else {
+        GATESTATE = { mode:null, error:"Something went wrong creating your songbook. Please try again." };
+        APP_STAGE = "gate";
+      }
+      render();
+    }).catch(function(e){
+      console.error("doCreateSpace failed", e);
+      GATESTATE = { mode:null, error:"Something went wrong creating your songbook. Please try again." };
+      APP_STAGE = "gate";
+      render();
+    });
+  }
+
+  function doJoinSpace(){
+    var input = document.getElementById("join-code-input");
+    var code = (input ? input.value : "").trim().toUpperCase();
+    if(!code){ GATESTATE.error = "Enter a code."; render(); return; }
+    APP_STAGE = "loading"; render();
+    tryLoadSpace(code, true).then(function(ok){
+      if(!ok){
+        GATESTATE = { mode:"join", error:"No songbook found for that code.", inputValue:code };
+        APP_STAGE = "gate";
+        render();
+      }
+    });
+  }
+
+  function doSwitchSongbook(){
+    if(!confirm("Switch to a different songbook? This device will stop syncing with the current one.")) return;
+    if(CHANNEL){ try{ sb.removeChannel(CHANNEL); }catch(e){} CHANNEL = null; }
+    safeRemove(CODE_STORAGE_KEY);
+    SPACE_CODE = null; OWNER_SECRET = null; DB = null; LOCAL_KEYS = {};
+    UISTATE.modal = null;
+    UISTATE.showOwnerUnlock = false;
+    UISTATE.ownerKeyError = null;
+    GATESTATE = { mode:null, error:null, code:null, inputValue:"" };
+    APP_STAGE = "gate";
+    render();
+  }
+
+  function copyCodeToClipboard(){
+    if(!SPACE_CODE) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(SPACE_CODE).catch(function(){});
+    }
+  }
+
+  function copyOwnerKeyToClipboard(){
+    if(!OWNER_SECRET) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(OWNER_SECRET).catch(function(){});
+    }
+  }
+
+  function submitOwnerKey(){
+    var input = document.getElementById("owner-key-input");
+    var key = input ? input.value.trim() : "";
+    if(!key){ UISTATE.ownerKeyError = "Enter a key."; render(); return; }
+    sb.rpc("verify_owner_secret", {p_space_id: SPACE_CODE, p_secret: key}).then(function(res){
+      if(res.error || !res.data){
+        UISTATE.ownerKeyError = "That key doesn't match this songbook.";
+        render();
+        return;
+      }
+      OWNER_SECRET = key;
+      safeSet(ownerSecretKey(SPACE_CODE), key);
+      UISTATE.ownerKeyError = null;
+      UISTATE.showOwnerUnlock = false;
+      render();
+    });
+  }
+
+  /* ============ ACTIONS (mutating, synced to Supabase) ============ */
+  function openSong(id){
+    DB.ui.currentSongId = id;
+    DB.ui.view = "song";
+    UISTATE.menuOpen = false;
+    render();
+  }
+
+  function startEdit(id){
+    UISTATE.editingId = id;
+    DB.ui.view = "edit";
+    UISTATE.menuOpen = false;
+    UISTATE.showChordImport = false;
+    var s = findSong(id);
+    EDIT_CONTENT_SNAPSHOT = s ? s.content : "";
+    render();
+  }
+
+  function convertChordSheetIntoEditor(){
+    var importEl = document.getElementById("chord-import-input");
+    var raw = importEl ? importEl.value : "";
+    if(!raw.trim()){ UISTATE.showChordImport = false; render(); return; }
+    var converted = convertChordSheet(raw);
+    var contentEl = document.querySelector('[data-field="content"]');
+    var existing = contentEl ? contentEl.value.trim() : "";
+    var merged = existing ? (existing + "\n\n" + converted) : converted;
+    UISTATE.showChordImport = false;
+    render();
+    var newContentEl = document.querySelector('[data-field="content"]');
+    if(newContentEl){ newContentEl.value = merged; }
+    EDIT_CONTENT_SNAPSHOT = merged;
+  }
+
+  function createNewSong(){
+    if(!isOwner()) return;
+    sb.rpc("create_song", {
+      p_space_id: SPACE_CODE, p_secret: OWNER_SECRET, p_title:"Untitled Song", p_original_key:"C",
+      p_format:"chords", p_content:"## Verse 1\n[C]Type your lyrics and [G]chords here", p_in_progress:true
+    }).then(function(res){
+      if(res.error){ console.error(res.error); return; }
+      var s = rowToSong(res.data);
+      DB.songs.push(s);
+      startEdit(s.id);
+    });
+  }
+
+  function saveSongFromForm(){
+    if(!isOwner()) return;
+    var s = findSong(UISTATE.editingId) || findSong(DB.ui.currentSongId);
+    if(!s){ return; }
+    var root = document.querySelector(".content-area");
+    var rpcParams = { p_space_id: SPACE_CODE, p_secret: OWNER_SECRET, p_song_id: s.id };
+    var changed = false;
+    if(root){
+      var titleEl = root.querySelector('[data-field="title"]');
+      var formatEl = root.querySelector('[data-field="format"]');
+      var keyEl = root.querySelector('[data-field="originalKey"]');
+      var contentEl = root.querySelector('[data-field="content"]');
+      var inProgEl = root.querySelector('[data-field="inProgress"]');
+      if(titleEl){ s.title = titleEl.value.trim() || "Untitled Song"; rpcParams.p_title = s.title; changed = true; }
+      if(formatEl){ s.format = formatEl.value; rpcParams.p_format = s.format; changed = true; }
+      if(keyEl && keyEl.value !== s.originalKey){ s.originalKey = keyEl.value; s.currentKey = keyEl.value; rpcParams.p_original_key = s.originalKey; rpcParams.p_current_key = s.currentKey; changed = true; }
+      if(contentEl){ s.content = contentEl.value; rpcParams.p_content = s.content; changed = true; }
+      if(inProgEl){ s.inProgress = inProgEl.checked; rpcParams.p_in_progress = s.inProgress; changed = true; }
+    }
+    DB.ui.currentSongId = s.id;
+    DB.ui.view = "song";
+    render();
+    if(changed){
+      sb.rpc("update_song", rpcParams).then(function(res){
+        if(res.error) console.error(res.error);
+      });
+    }
+  }
+
+  function deleteSongAction(){
+    if(!isOwner()) return;
+    var id = UISTATE.editingId || DB.ui.currentSongId;
+    if(!id || !confirm("Delete this song?")) return;
+    DB.songs = DB.songs.filter(function(s){return s.id!==id;});
+    DB.setlist.items = DB.setlist.items.filter(function(it){return it.songId!==id;});
+    DB.ui.currentSongId = DB.songs.length ? DB.songs[0].id : null;
+    DB.ui.view = "song";
+    render();
+    sb.rpc("delete_song", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_song_id:id}).then(function(res){
+      if(res.error) console.error(res.error);
+    });
+  }
+
+  function adjustKey(dir){
+    var song = findSong(DB.ui.currentSongId);
+    if(!song) return;
+    var idx = keyIndex(getDisplayKey(song));
+    idx = (idx + dir + 12) % 12;
+    var newKey = ALL_KEYS[idx];
+
+    if(isOwner()){
+      song.currentKey = newKey;
+      delete LOCAL_KEYS[song.id]; // this device now controls the shared key directly
+      saveLocalKeys();
+      render();
+      sb.rpc("update_song", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_song_id:song.id, p_current_key:newKey}).then(function(res){
+        if(res.error) console.error(res.error);
+      });
+    } else {
+      // Personal, local-only transpose — never written to Supabase.
+      LOCAL_KEYS[song.id] = newKey;
+      saveLocalKeys();
+      render();
+    }
+  }
+
+  function pickSong(target, songId){
+    UISTATE.modal = null;
+    if(!isOwner()){ render(); return; }
+    if(target === "setlist"){
+      var pos = DB.setlist.items.length;
+      sb.rpc("create_setlist_item", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_setlist_id:DB.setlist.id, p_song_id:songId, p_position:pos}).then(function(res){
+        if(res.error){ console.error(res.error); render(); return; }
+        DB.setlist.items.push(rowToSetlistItem(res.data));
+        render();
+      });
+    } else {
+      var s = findSong(songId);
+      if(s){ s.inProgress = true; }
+      render();
+      sb.rpc("update_song", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_song_id:songId, p_in_progress:true}).then(function(res){
+        if(res.error) console.error(res.error);
+      });
+    }
+  }
+
+  function moveSetlistItem(idx, dir){
+    if(!isOwner()) return;
+    var arr = DB.setlist.items;
+    var j = idx + dir;
+    if(j<0 || j>=arr.length) return;
+    var a = arr[idx], b = arr[j];
+    var posA = a.position, posB = b.position;
+    a.position = posB; b.position = posA;
+    arr.sort(function(x,y){return x.position-y.position;});
+    render();
+    Promise.all([
+      sb.rpc("update_setlist_item_position", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_item_id:a.id, p_position:a.position}),
+      sb.rpc("update_setlist_item_position", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_item_id:b.id, p_position:b.position})
+    ]).then(function(results){
+      results.forEach(function(r){ if(r.error) console.error(r.error); });
+    });
+  }
+
+  function removeSetlistItem(idx){
+    if(!isOwner()) return;
+    var item = DB.setlist.items[idx];
+    if(!item) return;
+    DB.setlist.items.splice(idx,1);
+    render();
+    sb.rpc("delete_setlist_item", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_item_id:item.id}).then(function(res){
+      if(res.error) console.error(res.error);
+    });
+  }
+
+  function removeInProgress(songId){
+    if(!isOwner()) return;
+    var s = findSong(songId);
+    if(!s) return;
+    s.inProgress = false;
+    render();
+    sb.rpc("update_song", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_song_id:songId, p_in_progress:false}).then(function(res){
+      if(res.error) console.error(res.error);
+    });
+  }
+
+  function saveEventFromForm(){
+    var nameEl = document.getElementById("ev-name");
+    var dateEl = document.getElementById("ev-date");
+    var name = nameEl ? nameEl.value.trim() : "";
+    UISTATE.modal = null;
+    if(!name || !isOwner()){ render(); return; }
+    var date = dateEl ? dateEl.value : "";
+    render();
+    sb.rpc("create_event", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_name:name, p_event_date: date || null}).then(function(res){
+      if(res.error){ console.error(res.error); return; }
+      DB.events.push(rowToEvent(res.data));
+      DB.events.sort(function(a,b){return (a.date||"").localeCompare(b.date||"");});
+      render();
+    });
+  }
+
+  function removeEventAction(idx){
+    if(!isOwner()) return;
+    var ev = DB.events[idx];
+    if(!ev) return;
+    DB.events.splice(idx,1);
+    render();
+    sb.rpc("delete_event", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_event_id:ev.id}).then(function(res){
+      if(res.error) console.error(res.error);
+    });
+  }
+
+  /* ============ EVENT DELEGATION ============ */
+  document.addEventListener("click", function(e){
+    // [data-stop] (the modal card) marks a boundary that clicks shouldn't bubble past on
+    // their way to an ancestor's [data-action] (the backdrop's close-modal). Whichever
+    // matches first — an actionable element or a stop boundary — wins. Without this, any
+    // click inside a modal that isn't itself a data-action element (e.g. a file input or
+    // textarea) bubbles straight through to the backdrop and closes the modal instantly.
+    var el = e.target.closest("[data-action], [data-stop]");
+    if(!el || !el.hasAttribute("data-action")) return;
+    var action = el.getAttribute("data-action");
+
+    switch(action){
+      // gate
+      case "gate-create": doCreateSpace(); break;
+      case "gate-show-join": GATESTATE = {mode:"join", error:null, inputValue:""}; render(); break;
+      case "gate-back": GATESTATE = {mode:null, error:null}; render(); break;
+      case "gate-join-submit": doJoinSpace(); break;
+      case "gate-continue": APP_STAGE = "app"; GATESTATE = {mode:null, error:null}; render(); break;
+
+      // app chrome
+      case "open-menu": UISTATE.menuOpen = true; render(); break;
+      case "close-menu": UISTATE.menuOpen = false; render(); break;
+      case "open-song": openSong(el.getAttribute("data-id")); break;
+      case "edit-current": startEdit(DB.ui.currentSongId); break;
+      case "new-song": createNewSong(); break;
+      case "key-up": adjustKey(1); break;
+      case "key-down": adjustKey(-1); break;
+      case "open-settings": UISTATE.modal = {type:"settings"}; render(); break;
+      case "close-modal": UISTATE.modal = null; render(); break;
+      case "copy-code": copyCodeToClipboard(); break;
+      case "copy-owner-key": copyOwnerKeyToClipboard(); break;
+      case "toggle-owner-unlock": UISTATE.showOwnerUnlock = !UISTATE.showOwnerUnlock; UISTATE.ownerKeyError = null; render(); break;
+      case "submit-owner-key": submitOwnerKey(); break;
+      case "switch-songbook": doSwitchSongbook(); break;
+
+      case "save-song": saveSongFromForm(); break;
+      case "cancel-edit": DB.ui.view = "song"; UISTATE.showChordImport = false; render(); break;
+      case "delete-song": deleteSongAction(); break;
+
+      case "toggle-chord-import": UISTATE.showChordImport = !UISTATE.showChordImport; render(); break;
+      case "convert-chord-sheet": convertChordSheetIntoEditor(); break;
+
+      case "search-clear": UISTATE.search=""; render(); break;
+
+      case "open-picker-setlist": UISTATE.modal = {type:"picker", target:"setlist"}; render(); break;
+      case "open-picker-progress": UISTATE.modal = {type:"picker", target:"progress"}; render(); break;
+      case "pick-song": pickSong(el.getAttribute("data-target"), el.getAttribute("data-id")); break;
+      case "setlist-up": moveSetlistItem(parseInt(el.getAttribute("data-idx"),10), -1); break;
+      case "setlist-down": moveSetlistItem(parseInt(el.getAttribute("data-idx"),10), 1); break;
+      case "setlist-remove": removeSetlistItem(parseInt(el.getAttribute("data-idx"),10)); break;
+      case "remove-in-progress": removeInProgress(el.getAttribute("data-id")); break;
+
+      case "open-add-event": UISTATE.modal = {type:"event"}; render(); break;
+      case "save-event": saveEventFromForm(); break;
+      case "remove-event": removeEventAction(parseInt(el.getAttribute("data-idx"),10)); break;
+
+      case "open-bulk-import":
+        if(isOwner()){ UISTATE.modal = {type:"bulk", error:null, text:""}; render(); }
+        break;
+      case "run-bulk-import": {
+        var bulkInput = document.getElementById("bulk-import-input");
+        var bulkRaw = bulkInput ? bulkInput.value : "";
+        if(!bulkRaw.trim()){
+          UISTATE.modal = {type:"bulk", error:"Paste or upload some songs first.", text:bulkRaw};
+          render();
+          break;
+        }
+        doBulkImportFromText(bulkRaw);
+        break;
+      }
+    }
+  });
+
+  document.addEventListener("input", function(e){
+    if(e.target.getAttribute("data-action") === "search-input"){
+      UISTATE.search = e.target.value;
+      render();
+      var input = document.querySelector('[data-action="search-input"]');
+      if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      return;
+    }
+    if(e.target.getAttribute("data-field") === "content"){
+      diffAndMaybeConvertContent(e.target);
+    }
+  });
+
+  document.addEventListener("change", function(e){
+    if(e.target.id === "set-columns"){
+      UISTATE.columns = e.target.value;
+      render();
+      return;
+    }
+    if(e.target.id === "bulk-file-input"){
+      var file = e.target.files && e.target.files[0];
+      if(!file) return;
+      var importBtn = document.querySelector('[data-action="run-bulk-import"]');
+      if(importBtn){ importBtn.disabled = true; importBtn.textContent = "Loading file…"; }
+      var reader = new FileReader();
+      reader.onload = function(){
+        var ta = document.getElementById("bulk-import-input");
+        if(ta){ ta.value = String(reader.result || ""); }
+        if(importBtn){ importBtn.disabled = false; importBtn.textContent = "Import songs"; }
+      };
+      reader.onerror = function(){
+        if(importBtn){ importBtn.disabled = false; importBtn.textContent = "Import songs"; }
+        UISTATE.modal = { type:"bulk", error:"Couldn't read that file. Try pasting the text instead.", text:"" };
+        render();
+      };
+      reader.readAsText(file);
+    }
+  });
+
+  document.addEventListener("keydown", function(e){
+    if(e.key !== "Enter" || !document.activeElement) return;
+    if(document.activeElement.id === "join-code-input"){ doJoinSpace(); }
+    if(document.activeElement.id === "owner-key-input"){ submitOwnerKey(); }
+  });
+
+  /* ============ BOOT ============ */
+  (function boot(){
+    var saved = safeGet(CODE_STORAGE_KEY);
+    if(saved){
+      var cached = safeGet(cacheKey(saved));
+      if(cached){
+        try{ DB = JSON.parse(cached); SPACE_CODE = saved; OWNER_SECRET = safeGet(ownerSecretKey(saved)); LOCAL_KEYS = loadLocalKeys(saved); APP_STAGE = "app"; render(); }catch(e){}
+      }
+      tryLoadSpace(saved, true).then(function(ok){
+        if(!ok){
+          safeRemove(CODE_STORAGE_KEY);
+          DB = null; SPACE_CODE = null;
+          GATESTATE = {mode:null, error:null};
+          APP_STAGE = "gate";
+          render();
+        }
+      });
+    } else {
+      APP_STAGE = "gate";
+      render();
+    }
+  })();
+})();
+</script>
+<script>
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
+</script>
+</body>
+</html>
