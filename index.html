@@ -12,6 +12,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Songbook">
+<script>
+  // Set the theme before first paint so switching pages/reloads never flashes light-then-dark.
+  (function(){
+    try{
+      var t = localStorage.getItem("songbookTheme");
+      if(!t){ t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; }
+      if(t === "dark"){ document.documentElement.setAttribute("data-theme", "dark"); }
+    }catch(e){}
+  })();
+</script>
 <style>
   :root{
     --dark:#26282c;
@@ -23,9 +33,48 @@
     --muted:#8a8f98;
     --border:#e4e6ea;
     --panel-bg:#ffffff;
+    --surface:#ffffff;
+    --surface-hover:#f0f1f3;
+    --surface-alt:#f6f7f9;
+    --input-border:#cfd6e0;
+    --accent-soft:#eef2f8;
+    --danger-border:#f0c9c9;
+    --danger-hover:#fdf2f2;
+    --success-bg:#eaf7ec;
+    --success-text:#1c7c34;
+    --neutral-badge-bg:#f3f4f6;
+    --overlay:rgba(0,0,0,.35);
+    --shadow:rgba(0,0,0,.15);
+    --modal-shadow:rgba(0,0,0,.2);
+    color-scheme:light;
+  }
+  html[data-theme="dark"]{
+    --dark:#e7e9ec;
+    --navy:#6fa0e6;
+    --blue:#7fb2ff;
+    --blue-dark:#5488ce;
+    --bg:#15171b;
+    --text:#e7e9ec;
+    --muted:#9aa1ab;
+    --border:#2e3239;
+    --panel-bg:#1b1e24;
+    --surface:#1b1e24;
+    --surface-hover:#262a31;
+    --surface-alt:#20232a;
+    --input-border:#3a3f48;
+    --accent-soft:#20293a;
+    --danger-border:#5c2c2c;
+    --danger-hover:#2c1c1c;
+    --success-bg:#173324;
+    --success-text:#5fd382;
+    --neutral-badge-bg:#262a31;
+    --overlay:rgba(0,0,0,.55);
+    --shadow:rgba(0,0,0,.4);
+    --modal-shadow:rgba(0,0,0,.5);
+    color-scheme:dark;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);}
+  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);transition:background .15s ease,color .15s ease;}
   #app{height:100vh;display:flex;flex-direction:column;overflow:hidden;position:relative;}
 
   /* ---------- Header ---------- */
@@ -79,45 +128,45 @@
     border:none;font-size:20px;font-weight:500;flex:1.4;min-width:180px;outline:none;background:transparent;
   }
   .edit-meta select{
-    border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:14px;background:#fff;color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:14px;background:var(--surface);color:var(--text);
   }
   .edit-meta label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
   .edit-body{flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;}
   .edit-body textarea{
-    flex:1;min-height:320px;width:100%;border:1px solid var(--border);border-radius:8px;padding:16px;
+    flex:1;min-height:320px;width:100%;border:1px solid var(--border);border-radius:8px;padding:16px;background:var(--bg);color:var(--text);
     font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:14.5px;line-height:1.8;resize:vertical;outline:none;
   }
-  .edit-hint{font-size:12.5px;color:var(--muted);background:#f6f7f9;border-radius:8px;padding:10px 14px;}
-  .edit-hint code{background:#eceff3;padding:1px 5px;border-radius:4px;}
+  .edit-hint{font-size:12.5px;color:var(--muted);background:var(--surface-alt);border-radius:8px;padding:10px 14px;}
+  .edit-hint code{background:var(--surface-hover);padding:1px 5px;border-radius:4px;}
   .edit-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border);}
   .edit-footer .left-actions label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);}
   .edit-footer .right-actions{display:flex;gap:10px;}
   .btn{border:none;border-radius:22px;padding:10px 20px;font-size:14.5px;cursor:pointer;font-weight:500;}
   .btn-primary{background:var(--navy);color:#fff;}
-  .btn-primary:hover{background:#173257;}
-  .btn-secondary{background:#f0f1f3;color:var(--text);}
-  .btn-secondary:hover{background:#e5e7ea;}
-  .btn-danger{background:#fff;color:#c23b3b;border:1px solid #f0c9c9;}
-  .btn-danger:hover{background:#fdf2f2;}
+  .btn-primary:hover{filter:brightness(0.88);}
+  .btn-secondary{background:var(--surface-hover);color:var(--text);}
+  .btn-secondary:hover{filter:brightness(0.94);}
+  .btn-danger{background:var(--surface);color:#e05a5a;border:1px solid var(--danger-border);}
+  .btn-danger:hover{background:var(--danger-hover);}
 
   /* ---------- Menu drawer ---------- */
   .overlay{
-    position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:20;
+    position:absolute;inset:0;background:var(--overlay);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:20;
   }
   .overlay.open{opacity:1;pointer-events:auto;}
   .menu-drawer{
-    position:absolute;top:0;left:0;bottom:0;width:min(420px,88%);background:#fff;
+    position:absolute;top:0;left:0;bottom:0;width:min(420px,88%);background:var(--surface);
     transform:translateX(-100%);transition:transform .22s ease;z-index:21;
-    display:flex;flex-direction:column;box-shadow:2px 0 18px rgba(0,0,0,.15);
+    display:flex;flex-direction:column;box-shadow:2px 0 18px var(--shadow);
   }
   .menu-drawer.open{transform:translateX(0);}
   .menu-header{background:#063986;color:#fff;padding:20px 20px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}
   .menu-header h2{margin:0;font-size:22px;font-weight:800;letter-spacing:.5px;}
   .menu-header button{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
-  .menu-body{flex:1;overflow-y:auto;padding:16px 20px 90px;}
+  .menu-body{flex:1;overflow-y:auto;padding:16px 20px 90px;background:var(--surface);color:var(--text);}
   .search-wrap{position:relative;margin-bottom:18px;}
   .search-wrap input{
-    width:100%;padding:11px 38px 11px 16px;border-radius:22px;border:2px solid #cfd6e0;font-size:15px;outline:none;
+    width:100%;padding:11px 38px 11px 16px;border-radius:22px;border:2px solid var(--input-border);font-size:15px;outline:none;background:var(--bg);color:var(--text);
   }
   .search-wrap input:focus{border-color:var(--text);}
   .search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;color:var(--muted);cursor:pointer;}
@@ -128,7 +177,7 @@
   .menu-section-head .add-link{color:var(--text);font-size:14px;font-weight:600;background:none;border:none;cursor:pointer;}
   .menu-empty{color:var(--muted);font-size:14px;padding:6px 0;}
   .menu-row{
-    display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f0f1f3;
+    display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--surface-hover);
   }
   .menu-row .idx{color:var(--muted);font-size:14px;width:16px;}
   .menu-row .row-title{flex:1;color:var(--text);font-size:15.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -137,51 +186,61 @@
   .menu-row .mini-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:3px;display:flex;}
   .menu-row .mini-btn:hover{color:var(--text);}
   .menu-row .mini-btn svg{width:14px;height:14px;}
-  .lib-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f3;cursor:pointer;}
+  .lib-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--surface-hover);cursor:pointer;}
   .lib-row:hover .row-title{text-decoration:underline;}
   .lib-row .row-title{color:var(--text);font-size:15.5px;}
   .lib-row .key-badge{color:var(--muted);font-size:14px;}
-  .event-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f3;}
+  .event-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--surface-hover);}
   .event-row .ev-name{font-size:15px;}
   .event-row .ev-date{color:var(--muted);font-size:13px;}
   .new-song-btn{
     position:absolute;left:20px;right:20px;bottom:18px;background:var(--navy);color:#fff;border:none;
     padding:15px;border-radius:26px;font-size:16px;font-weight:700;letter-spacing:.3px;cursor:pointer;
   }
-  .new-song-btn:hover{background:#173257;}
-  .picker-list{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px;}
-  .picker-list .picker-row{padding:9px 12px;cursor:pointer;font-size:14.5px;border-bottom:1px solid #f2f3f5;}
-  .picker-list .picker-row:hover{background:#f5f7fa;}
+  .new-song-btn:hover{filter:brightness(0.88);}
+  .picker-list{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:var(--surface);}
+  .picker-list .picker-row{padding:9px 12px;cursor:pointer;font-size:14.5px;border-bottom:1px solid var(--surface-hover);color:var(--text);}
+  .picker-list .picker-row:hover{background:var(--surface-hover);}
   .picker-list .picker-row:last-child{border-bottom:none;}
 
   /* modal */
-  .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:30;}
-  .modal{background:#fff;border-radius:12px;padding:22px;width:min(340px,88%);box-shadow:0 10px 40px rgba(0,0,0,.2);}
+  .modal-backdrop{position:absolute;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:30;}
+  .modal{background:var(--surface);color:var(--text);border-radius:12px;padding:22px;width:min(340px,88%);box-shadow:0 10px 40px var(--modal-shadow);}
   .modal h3{margin:0 0 14px;font-size:17px;}
-  .modal input,.modal select{width:100%;padding:9px 12px;border-radius:7px;border:1px solid var(--border);font-size:14.5px;margin-bottom:12px;outline:none;}
+  .modal input,.modal select{width:100%;padding:9px 12px;border-radius:7px;border:1px solid var(--border);font-size:14.5px;margin-bottom:12px;outline:none;background:var(--bg);color:var(--text);}
   .modal .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
 
   /* ---------- Gate / loading ---------- */
   .loading-wrap{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px;}
-  .gate-wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:24px;background:#f7f8fa;}
+  .gate-wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--surface-alt);}
   .gate-card{max-width:380px;width:100%;text-align:center;}
   .gate-card h1{font-size:26px;margin:0 0 6px;color:var(--dark);}
   .gate-card p.sub{color:var(--muted);font-size:14.5px;margin:0 0 26px;line-height:1.5;}
   .gate-options{display:flex;flex-direction:column;gap:12px;}
-  .gate-btn{padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:15px;text-align:left;}
+  .gate-btn{padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:15px;text-align:left;}
   .gate-btn strong{display:block;font-size:15.5px;margin-bottom:2px;color:var(--text);}
   .gate-btn span{color:var(--muted);font-size:13px;}
   .gate-btn:hover{border-color:var(--blue);}
   .gate-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
-  .gate-form input{padding:12px 14px;border-radius:8px;border:1px solid var(--border);font-size:18px;letter-spacing:3px;text-transform:uppercase;text-align:center;}
-  .gate-error{color:#c23b3b;font-size:13.5px;}
-  .gate-code-display{font-size:30px;letter-spacing:5px;font-weight:800;color:var(--navy);background:#eef2f8;border-radius:10px;padding:18px;margin:18px 0;}
-  .gate-secret-display{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:13px;word-break:break-all;background:#eef2f8;border-radius:8px;padding:12px;margin:8px 0 18px;color:var(--navy);text-align:left;}
+  .gate-form input{padding:12px 14px;border-radius:8px;border:1px solid var(--border);font-size:18px;letter-spacing:3px;text-transform:uppercase;text-align:center;background:var(--bg);color:var(--text);}
+  .gate-error{color:#e05a5a;font-size:13.5px;}
+  .gate-code-display{font-size:30px;letter-spacing:5px;font-weight:800;color:var(--navy);background:var(--accent-soft);border-radius:10px;padding:18px;margin:18px 0;}
+  .gate-secret-display{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:13px;word-break:break-all;background:var(--accent-soft);border-radius:8px;padding:12px;margin:8px 0 18px;color:var(--navy);text-align:left;}
   .field-label{font-size:13px;color:var(--muted);display:block;text-align:left;margin-bottom:4px;}
   .role-badge{border-radius:8px;padding:10px 12px;font-size:13.5px;margin-bottom:16px;text-align:left;}
-  .role-badge.owner{background:#eaf7ec;color:#1c7c34;}
-  .role-badge.viewer{background:#f3f4f6;color:var(--muted);}
+  .role-badge.owner{background:var(--success-bg);color:var(--success-text);}
+  .role-badge.viewer{background:var(--neutral-badge-bg);color:var(--muted);}
   .full-btn{width:100%;padding:14px;}
+
+  /* ---------- Settings: dark mode toggle ---------- */
+  .theme-toggle{display:flex;align-items:center;justify-content:space-between;padding:2px 0 16px;}
+  .theme-toggle .toggle-label{font-size:14.5px;color:var(--text);}
+  .switch{position:relative;display:inline-block;width:42px;height:24px;flex:0 0 auto;}
+  .switch input{opacity:0;width:0;height:0;}
+  .switch .slider{position:absolute;cursor:pointer;inset:0;background:var(--surface-hover);border:1px solid var(--border);border-radius:24px;transition:.15s;}
+  .switch .slider:before{position:absolute;content:"";height:16px;width:16px;left:3px;top:2.5px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .switch input:checked + .slider{background:var(--navy);}
+  .switch input:checked + .slider:before{transform:translateX(18px);}
 
   @media (max-width:520px){
     .song-content{columns:1;padding:20px;}
@@ -205,12 +264,22 @@
   function cacheKey(code){ return "songbookCache_" + code; }
   function ownerSecretKey(code){ return "songbookOwnerSecret_" + code; }
   function localKeysStorageKey(code){ return "songbookLocalKeys_" + code; }
+  var THEME_STORAGE_KEY = "songbookTheme";
 
   // Storage can throw (Safari private mode, restricted webviews, opaque origins) —
   // never let a storage failure take down the app; fall back to in-memory only.
   function safeGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
   function safeSet(key, val){ try{ localStorage.setItem(key, val); }catch(e){} }
   function safeRemove(key){ try{ localStorage.removeItem(key); }catch(e){} }
+
+  // The <head> boot script already set data-theme="dark" on <html> (before first paint)
+  // if that was the saved/system preference, so we just read it back here to stay in sync.
+  function currentTheme(){ return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+  function applyTheme(theme){
+    if(theme === "dark"){ document.documentElement.setAttribute("data-theme", "dark"); }
+    else { document.documentElement.removeAttribute("data-theme"); }
+    safeSet(THEME_STORAGE_KEY, theme);
+  }
 
   var NOTES_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
   var NOTES_FLAT  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
@@ -903,6 +972,7 @@
             '<button class="btn btn-secondary" data-action="copy-code" style="padding:9px 14px;">Copy</button>'+
           '</div>'+
           ownerSection+
+          '<div class="theme-toggle"><span class="toggle-label">Dark mode</span><label class="switch"><input type="checkbox" id="set-theme"'+(currentTheme()==="dark"?" checked":"")+'><span class="slider"></span></label></div>'+
           '<label style="font-size:13px;color:var(--muted);">Columns</label>'+
           '<select id="set-columns">'+
             '<option value="auto"'+(UISTATE.columns!=="1"?" selected":"")+'>Auto</option>'+
@@ -1443,6 +1513,10 @@
   });
 
   document.addEventListener("change", function(e){
+    if(e.target.id === "set-theme"){
+      applyTheme(e.target.checked ? "dark" : "light");
+      return; // no render() needed — CSS variables handle the whole repaint
+    }
     if(e.target.id === "set-columns"){
       UISTATE.columns = e.target.value;
       render();
