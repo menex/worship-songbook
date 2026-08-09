@@ -13,12 +13,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Songbook">
 <script>
-  // Set the theme before first paint so switching pages/reloads never flashes light-then-dark.
+  // Set theme + text size before first paint so reloads never flash the wrong look.
   (function(){
     try{
       var t = localStorage.getItem("songbookTheme");
       if(!t){ t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; }
       if(t === "dark"){ document.documentElement.setAttribute("data-theme", "dark"); }
+    }catch(e){}
+    try{
+      var s = localStorage.getItem("songbookTextSize");
+      if(s === "sm" || s === "lg"){ document.documentElement.setAttribute("data-textsize", s); }
     }catch(e){}
   })();
 </script>
@@ -46,8 +50,13 @@
     --overlay:rgba(0,0,0,.35);
     --shadow:rgba(0,0,0,.15);
     --modal-shadow:rgba(0,0,0,.2);
+    --lyric-size:17px;
+    --chord-size:14px;
+    --section-size:16px;
     color-scheme:light;
   }
+  html[data-textsize="sm"]{ --lyric-size:15px; --chord-size:12.5px; --section-size:14px; }
+  html[data-textsize="lg"]{ --lyric-size:20px; --chord-size:16.5px; --section-size:19px; }
   html[data-theme="dark"]{
     --dark:#e7e9ec;
     --navy:#6fa0e6;
@@ -73,9 +82,11 @@
     --modal-shadow:rgba(0,0,0,.5);
     color-scheme:dark;
   }
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);transition:background .15s ease,color .15s ease;}
   #app{height:100vh;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+  button,.icon-btn,.btn,.gate-btn,.menu-row,.lib-row,.mini-btn,.switch,.picker-row,.new-song-btn{touch-action:manipulation;}
+  button,.menu-header,.app-header,.new-song-btn,.gate-btn strong{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 
   /* ---------- Header ---------- */
   .app-header{
@@ -83,21 +94,23 @@
     color:#fff;
     display:flex;
     align-items:center;
-    padding:0 14px;
-    height:54px;
+    padding:0 10px;
+    height:58px;
     flex:0 0 auto;
-    gap:10px;
+    gap:6px;
   }
-  .app-header .left-group{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+  .app-header .left-group{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
   .app-header .title{flex:2;text-align:center;font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .app-header .right-group{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:16px;}
-  .icon-btn{background:none;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:6px;border-radius:6px;opacity:.9;}
+  .app-header .right-group{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:8px;}
+  .icon-btn{background:none;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:8px;border-radius:8px;opacity:.9;}
   .icon-btn:hover{opacity:1;background:rgba(255,255,255,.08);}
-  .icon-btn svg{width:20px;height:20px;}
-  .key-control{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500;white-space:nowrap;}
-  .key-control button{background:none;border:1px solid rgba(255,255,255,.35);color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;}
+  .icon-btn:active{background:rgba(255,255,255,.16);}
+  .icon-btn svg{width:22px;height:22px;}
+  .key-control{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:500;white-space:nowrap;}
+  .key-control button{background:none;border:1px solid rgba(255,255,255,.35);color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;}
   .key-control button:hover{background:rgba(255,255,255,.15);}
-  .key-label{min-width:14px;text-align:center;opacity:.95;}
+  .key-control button:active{background:rgba(255,255,255,.25);}
+  .key-label{min-width:16px;text-align:center;opacity:.95;font-size:16px;}
 
   /* ---------- Song viewer ---------- */
   .content-area{flex:1;overflow-y:auto;position:relative;}
@@ -111,13 +124,13 @@
     padding: 30px 40px 60px;
   }
   .song-section{break-inside:avoid;margin-bottom:34px;}
-  .section-label{font-weight:800;font-size:16px;letter-spacing:.4px;margin-bottom:14px;text-transform:uppercase;}
-  .lyric-line{margin-bottom:6px;line-height:2.1;white-space:normal;}
+  .section-label{font-weight:800;font-size:var(--section-size);letter-spacing:.4px;margin-bottom:14px;text-transform:uppercase;}
+  .lyric-line{margin-bottom:6px;line-height:2.1;white-space:normal;font-size:var(--lyric-size);}
   .lyric-line.blank{height:14px;}
   .chord-pair{display:inline-block;position:relative;padding-top:1.15em;vertical-align:bottom;}
-  .chord-pair .chord{position:absolute;top:0;left:0;color:var(--blue);font-weight:700;font-size:13px;white-space:nowrap;}
+  .chord-pair .chord{position:absolute;top:0;left:0;color:var(--blue);font-weight:700;font-size:var(--chord-size);white-space:nowrap;}
   .chord-pair .lyric{white-space:pre;}
-  .lyric-only-line{white-space:pre-wrap;}
+  .lyric-only-line{white-space:pre-wrap;font-size:var(--lyric-size);}
 
   /* ---------- Edit screen ---------- */
   .edit-meta{
@@ -141,7 +154,7 @@
   .edit-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border);}
   .edit-footer .left-actions label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);}
   .edit-footer .right-actions{display:flex;gap:10px;}
-  .btn{border:none;border-radius:22px;padding:10px 20px;font-size:14.5px;cursor:pointer;font-weight:500;}
+  .btn{border:none;border-radius:22px;padding:12px 22px;font-size:15px;cursor:pointer;font-weight:500;min-height:44px;}
   .btn-primary{background:var(--navy);color:#fff;}
   .btn-primary:hover{filter:brightness(0.88);}
   .btn-secondary{background:var(--surface-hover);color:var(--text);}
@@ -160,55 +173,57 @@
     display:flex;flex-direction:column;box-shadow:2px 0 18px var(--shadow);
   }
   .menu-drawer.open{transform:translateX(0);}
-  .menu-header{background:#063986;color:#fff;padding:20px 20px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}
+  .menu-header{background:#063986;color:#fff;padding:14px 12px 14px 20px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}
   .menu-header h2{margin:0;font-size:22px;font-weight:800;letter-spacing:.5px;}
-  .menu-header button{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
+  .menu-header button{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+  .menu-header button:hover{background:rgba(255,255,255,.1);}
   .menu-body{flex:1;overflow-y:auto;padding:16px 20px 90px;background:var(--surface);color:var(--text);}
   .search-wrap{position:relative;margin-bottom:18px;}
   .search-wrap input{
-    width:100%;padding:11px 38px 11px 16px;border-radius:22px;border:2px solid var(--input-border);font-size:15px;outline:none;background:var(--bg);color:var(--text);
+    width:100%;padding:13px 42px 13px 18px;border-radius:24px;border:2px solid var(--input-border);font-size:16px;outline:none;background:var(--bg);color:var(--text);min-height:48px;
   }
   .search-wrap input:focus{border-color:var(--text);}
-  .search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;color:var(--muted);cursor:pointer;}
+  .search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:17px;color:var(--muted);cursor:pointer;min-width:38px;min-height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .search-clear:hover{background:var(--surface-hover);}
   .search-results-empty{color:var(--muted);font-size:14px;margin-bottom:10px;}
   .menu-section{margin-bottom:26px;}
   .menu-section-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--dark);padding-bottom:6px;margin-bottom:8px;}
   .menu-section-head h3{margin:0;font-size:14px;font-weight:800;letter-spacing:.4px;color:var(--navy);text-transform:uppercase;}
-  .menu-section-head .add-link{color:var(--text);font-size:14px;font-weight:600;background:none;border:none;cursor:pointer;}
+  .menu-section-head .add-link{color:var(--text);font-size:14.5px;font-weight:600;background:none;border:none;cursor:pointer;padding:10px 4px;min-height:44px;}
   .menu-empty{color:var(--muted);font-size:14px;padding:6px 0;}
   .menu-row{
-    display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--surface-hover);
+    display:flex;align-items:center;gap:8px;padding:13px 0;border-bottom:1px solid var(--surface-hover);min-height:44px;
   }
   .menu-row .idx{color:var(--muted);font-size:14px;width:16px;}
-  .menu-row .row-title{flex:1;color:var(--text);font-size:15.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .menu-row .row-title{flex:1;color:var(--text);font-size:16px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 0;}
   .menu-row .row-title:hover{text-decoration:underline;}
   .menu-row .key-badge{color:var(--muted);font-size:14px;width:18px;text-align:center;}
-  .menu-row .mini-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:3px;display:flex;}
-  .menu-row .mini-btn:hover{color:var(--text);}
-  .menu-row .mini-btn svg{width:14px;height:14px;}
-  .lib-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--surface-hover);cursor:pointer;}
+  .menu-row .mini-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;min-width:40px;min-height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+  .menu-row .mini-btn:hover{color:var(--text);background:var(--surface-hover);}
+  .menu-row .mini-btn svg{width:16px;height:16px;}
+  .lib-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--surface-hover);cursor:pointer;min-height:44px;}
   .lib-row:hover .row-title{text-decoration:underline;}
-  .lib-row .row-title{color:var(--text);font-size:15.5px;}
+  .lib-row .row-title{color:var(--text);font-size:16px;}
   .lib-row .key-badge{color:var(--muted);font-size:14px;}
-  .event-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--surface-hover);}
-  .event-row .ev-name{font-size:15px;}
-  .event-row .ev-date{color:var(--muted);font-size:13px;}
+  .event-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--surface-hover);min-height:44px;}
+  .event-row .ev-name{font-size:15.5px;}
+  .event-row .ev-date{color:var(--muted);font-size:13.5px;}
   .new-song-btn{
     position:absolute;left:20px;right:20px;bottom:18px;background:var(--navy);color:#fff;border:none;
-    padding:15px;border-radius:26px;font-size:16px;font-weight:700;letter-spacing:.3px;cursor:pointer;
+    padding:17px;border-radius:26px;font-size:16.5px;font-weight:700;letter-spacing:.3px;cursor:pointer;min-height:52px;
   }
   .new-song-btn:hover{filter:brightness(0.88);}
-  .picker-list{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:var(--surface);}
-  .picker-list .picker-row{padding:9px 12px;cursor:pointer;font-size:14.5px;border-bottom:1px solid var(--surface-hover);color:var(--text);}
+  .picker-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:var(--surface);}
+  .picker-list .picker-row{padding:12px;cursor:pointer;font-size:15px;border-bottom:1px solid var(--surface-hover);color:var(--text);min-height:44px;display:flex;align-items:center;}
   .picker-list .picker-row:hover{background:var(--surface-hover);}
   .picker-list .picker-row:last-child{border-bottom:none;}
 
   /* modal */
-  .modal-backdrop{position:absolute;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:30;}
-  .modal{background:var(--surface);color:var(--text);border-radius:12px;padding:22px;width:min(340px,88%);box-shadow:0 10px 40px var(--modal-shadow);}
-  .modal h3{margin:0 0 14px;font-size:17px;}
-  .modal input,.modal select{width:100%;padding:9px 12px;border-radius:7px;border:1px solid var(--border);font-size:14.5px;margin-bottom:12px;outline:none;background:var(--bg);color:var(--text);}
-  .modal .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
+  .modal-backdrop{position:absolute;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:30;padding:20px;}
+  .modal{background:var(--surface);color:var(--text);border-radius:12px;padding:24px;width:min(400px,92%);max-height:88vh;overflow-y:auto;box-shadow:0 10px 40px var(--modal-shadow);}
+  .modal h3{margin:0 0 14px;font-size:18px;}
+  .modal input,.modal select{width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);font-size:15.5px;margin-bottom:12px;outline:none;background:var(--bg);color:var(--text);min-height:46px;}
+  .modal .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px;}
 
   /* ---------- Gate / loading ---------- */
   .loading-wrap{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px;}
@@ -217,12 +232,12 @@
   .gate-card h1{font-size:26px;margin:0 0 6px;color:var(--dark);}
   .gate-card p.sub{color:var(--muted);font-size:14.5px;margin:0 0 26px;line-height:1.5;}
   .gate-options{display:flex;flex-direction:column;gap:12px;}
-  .gate-btn{padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:15px;text-align:left;}
-  .gate-btn strong{display:block;font-size:15.5px;margin-bottom:2px;color:var(--text);}
-  .gate-btn span{color:var(--muted);font-size:13px;}
+  .gate-btn{padding:16px 18px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:15px;text-align:left;min-height:44px;}
+  .gate-btn strong{display:block;font-size:16px;margin-bottom:2px;color:var(--text);}
+  .gate-btn span{color:var(--muted);font-size:13.5px;}
   .gate-btn:hover{border-color:var(--blue);}
   .gate-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
-  .gate-form input{padding:12px 14px;border-radius:8px;border:1px solid var(--border);font-size:18px;letter-spacing:3px;text-transform:uppercase;text-align:center;background:var(--bg);color:var(--text);}
+  .gate-form input{padding:14px 16px;border-radius:8px;border:1px solid var(--border);font-size:19px;letter-spacing:3px;text-transform:uppercase;text-align:center;background:var(--bg);color:var(--text);min-height:50px;}
   .gate-error{color:#e05a5a;font-size:13.5px;}
   .gate-code-display{font-size:30px;letter-spacing:5px;font-weight:800;color:var(--navy);background:var(--accent-soft);border-radius:10px;padding:18px;margin:18px 0;}
   .gate-secret-display{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:13px;word-break:break-all;background:var(--accent-soft);border-radius:8px;padding:12px;margin:8px 0 18px;color:var(--navy);text-align:left;}
@@ -232,19 +247,40 @@
   .role-badge.viewer{background:var(--neutral-badge-bg);color:var(--muted);}
   .full-btn{width:100%;padding:14px;}
 
-  /* ---------- Settings: dark mode toggle ---------- */
-  .theme-toggle{display:flex;align-items:center;justify-content:space-between;padding:2px 0 16px;}
-  .theme-toggle .toggle-label{font-size:14.5px;color:var(--text);}
-  .switch{position:relative;display:inline-block;width:42px;height:24px;flex:0 0 auto;}
+  /* ---------- Settings: toggles ---------- */
+  .theme-toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 0;min-height:44px;cursor:pointer;}
+  .theme-toggle .toggle-label{font-size:15px;color:var(--text);}
+  .switch{position:relative;display:inline-block;width:46px;height:27px;flex:0 0 auto;}
   .switch input{opacity:0;width:0;height:0;}
-  .switch .slider{position:absolute;cursor:pointer;inset:0;background:var(--surface-hover);border:1px solid var(--border);border-radius:24px;transition:.15s;}
-  .switch .slider:before{position:absolute;content:"";height:16px;width:16px;left:3px;top:2.5px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .switch .slider{position:absolute;cursor:pointer;inset:0;background:var(--surface-hover);border:1px solid var(--border);border-radius:27px;transition:.15s;}
+  .switch .slider:before{position:absolute;content:"";height:19px;width:19px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
   .switch input:checked + .slider{background:var(--navy);}
-  .switch input:checked + .slider:before{transform:translateX(18px);}
+  .switch input:checked + .slider:before{transform:translateX(19px);}
+
+  .field-row-label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px;}
+  .segmented{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+  .segmented button{flex:1;background:var(--surface);color:var(--text);border:none;padding:12px 8px;font-size:14.5px;cursor:pointer;min-height:44px;border-left:1px solid var(--border);}
+  .segmented button:first-child{border-left:none;}
+  .segmented button.active{background:var(--navy);color:#fff;font-weight:600;}
 
   @media (max-width:520px){
     .song-content{columns:1;padding:20px;}
     .app-header .title{font-size:15px;}
+  }
+  /* Tablet portrait/landscape: a bit more breathing room than phone, capped so lines of
+     lyrics don't stretch so wide they're hard to track from a music stand's distance. */
+  @media (min-width:521px) and (max-width:1023px){
+    .song-content{padding:30px 44px 60px;}
+  }
+  @media (min-width:1024px){
+    .song-content{padding:36px 64px 70px;column-gap:56px;}
+    .menu-drawer{width:min(420px,40%);}
+  }
+  /* Landscape tablets/phones: header can get cramped when the on-screen keyboard or a
+     notch eats vertical space — keep touch targets but trim a little padding. */
+  @media (max-height:420px) and (orientation:landscape){
+    .app-header{height:50px;}
+    .menu-header{padding:10px 12px 10px 18px;}
   }
 </style>
 </head>
@@ -279,6 +315,44 @@
     if(theme === "dark"){ document.documentElement.setAttribute("data-theme", "dark"); }
     else { document.documentElement.removeAttribute("data-theme"); }
     safeSet(THEME_STORAGE_KEY, theme);
+  }
+
+  var TEXTSIZE_STORAGE_KEY = "songbookTextSize";
+  function currentTextSize(){
+    var a = document.documentElement.getAttribute("data-textsize");
+    return (a === "sm" || a === "lg") ? a : "md";
+  }
+  function applyTextSize(size){
+    if(size === "sm" || size === "lg"){ document.documentElement.setAttribute("data-textsize", size); }
+    else { document.documentElement.removeAttribute("data-textsize"); }
+    safeSet(TEXTSIZE_STORAGE_KEY, size);
+  }
+
+  // Screen Wake Lock: keeps the tablet's display from sleeping while the songbook is open —
+  // useful when it's propped on a stand during a set and nobody's touching it between songs.
+  // Defaults on; auto-releases when the tab is hidden (per spec) and we reacquire on return.
+  var WAKELOCK_STORAGE_KEY = "songbookWakeLock";
+  var wakeLockSentinel = null;
+  function wakeLockSupported(){ return typeof navigator !== "undefined" && !!navigator.wakeLock; }
+  function wakeLockEnabled(){ var v = safeGet(WAKELOCK_STORAGE_KEY); return v === "off" ? false : true; }
+  function requestWakeLock(){
+    if(!wakeLockSupported() || !wakeLockEnabled() || wakeLockSentinel) return;
+    navigator.wakeLock.request("screen").then(function(sentinel){
+      wakeLockSentinel = sentinel;
+      sentinel.addEventListener("release", function(){ wakeLockSentinel = null; });
+    }).catch(function(){ /* denied/unsupported in this context — silently ignore */ });
+  }
+  function releaseWakeLock(){
+    if(wakeLockSentinel){ try{ wakeLockSentinel.release(); }catch(e){} wakeLockSentinel = null; }
+  }
+  function setWakeLockEnabled(on){
+    safeSet(WAKELOCK_STORAGE_KEY, on ? "on" : "off");
+    if(on){ requestWakeLock(); } else { releaseWakeLock(); }
+  }
+  if(typeof document !== "undefined"){
+    document.addEventListener("visibilitychange", function(){
+      if(document.visibilityState === "visible" && APP_STAGE === "app"){ requestWakeLock(); }
+    });
   }
 
   var NOTES_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -972,7 +1046,14 @@
             '<button class="btn btn-secondary" data-action="copy-code" style="padding:9px 14px;">Copy</button>'+
           '</div>'+
           ownerSection+
-          '<div class="theme-toggle"><span class="toggle-label">Dark mode</span><label class="switch"><input type="checkbox" id="set-theme"'+(currentTheme()==="dark"?" checked":"")+'><span class="slider"></span></label></div>'+
+          '<label class="theme-toggle"><span class="toggle-label">Dark mode</span><span class="switch"><input type="checkbox" id="set-theme"'+(currentTheme()==="dark"?" checked":"")+'><span class="slider"></span></span></label>'+
+          (wakeLockSupported() ? ('<label class="theme-toggle"><span class="toggle-label">Keep screen awake</span><span class="switch"><input type="checkbox" id="set-wakelock"'+(wakeLockEnabled()?" checked":"")+'><span class="slider"></span></span></label>') : '')+
+          '<span class="field-row-label">Text size</span>'+
+          '<div class="segmented">'+
+            '<button type="button" data-action="set-textsize" data-size="sm" class="'+(currentTextSize()==="sm"?"active":"")+'">Small</button>'+
+            '<button type="button" data-action="set-textsize" data-size="md" class="'+(currentTextSize()==="md"?"active":"")+'">Medium</button>'+
+            '<button type="button" data-action="set-textsize" data-size="lg" class="'+(currentTextSize()==="lg"?"active":"")+'">Large</button>'+
+          '</div>'+
           '<label style="font-size:13px;color:var(--muted);">Columns</label>'+
           '<select id="set-columns">'+
             '<option value="auto"'+(UISTATE.columns!=="1"?" selected":"")+'>Auto</option>'+
@@ -996,6 +1077,7 @@
     var body = DB.ui.view === "edit" ? renderEditView() : renderSongView();
     app.innerHTML = renderHeader() + body + renderMenu() + renderModal();
     applyColumnSetting();
+    requestWakeLock();
     if(SPACE_CODE && DB){
       safeSet(cacheKey(SPACE_CODE), JSON.stringify(DB));
     }
@@ -1454,6 +1536,7 @@
       case "key-up": adjustKey(1); break;
       case "key-down": adjustKey(-1); break;
       case "open-settings": UISTATE.modal = {type:"settings"}; render(); break;
+      case "set-textsize": applyTextSize(el.getAttribute("data-size")); render(); break;
       case "close-modal": UISTATE.modal = null; render(); break;
       case "copy-code": copyCodeToClipboard(); break;
       case "copy-owner-key": copyOwnerKeyToClipboard(); break;
@@ -1516,6 +1599,10 @@
     if(e.target.id === "set-theme"){
       applyTheme(e.target.checked ? "dark" : "light");
       return; // no render() needed — CSS variables handle the whole repaint
+    }
+    if(e.target.id === "set-wakelock"){
+      setWakeLockEnabled(e.target.checked);
+      return;
     }
     if(e.target.id === "set-columns"){
       UISTATE.columns = e.target.value;
