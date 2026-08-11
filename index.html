@@ -366,15 +366,8 @@
   var OWNER_SECRET = null;
   var CHANNEL = null;
   var DB = null;
-  var UISTATE = { menuOpen:false, search:"", modal:null, editingId:null, columns:"auto", showOwnerUnlock:false, ownerKeyError:null, showChordImport:false };
+  var UISTATE = { menuOpen:false, search:"", modal:null, editingId:null, columns:"auto", showOwnerUnlock:false, ownerKeyError:null };
   function isOwner(){ return !!OWNER_SECRET; }
-
-  // Tracks the last-known value of the edit screen's content textarea so we can diff
-  // against it on every "input" event and detect a large chunk of pasted text — this
-  // works regardless of *how* the paste happened (Ctrl+V, right-click menu, mobile
-  // "Paste" bubble, drag-drop), unlike intercepting the "paste" event, whose
-  // clipboardData is unreliable across browsers/mobile webviews.
-  var EDIT_CONTENT_SNAPSHOT = null;
 
   // Personal, device-only key overrides for viewers (never synced to Supabase).
   // Owners always see/control the shared key directly, so this is ignored for them.
@@ -460,11 +453,17 @@
   function isChordToken(tok){
     return /^[A-G](#|b)?(maj7|maj|min7|min|dim7|dim|aug|sus2|sus4|sus|add9|add|m7|m|-)?[0-9]*(\/[A-G](#|b)?)?$/.test(tok);
   }
+  // A "+"-joined run like "G+D+Am" represents 2+ chords meant to land on the exact same
+  // beat/word (a quick chord run right before a downbeat) — see bracketsToChordOverLyric.
+  function isChordClusterToken(tok){
+    var parts = tok.split("+");
+    return parts.length > 1 && parts.every(isChordToken);
+  }
   function isChordLine(line){
     var t = line.trim();
     if(!t) return false;
     var toks = t.split(/\s+/);
-    return toks.every(isChordToken);
+    return toks.every(function(tok){ return isChordToken(tok) || isChordClusterToken(tok); });
   }
   function isLabelLine(line){
     var t = line.trim();
@@ -495,12 +494,15 @@
     while(out.length && out[out.length-1].trim() === ""){ out.pop(); }
     return out.join("\n");
   }
-  // Finds the start of the word that column `col` falls inside (or on). If `col` lands
-  // exactly on whitespace (the gap between words — very common, since chord sheets are
-  // typically typed with the chord centered in the blank space before the syllable it
-  // belongs to), we skip forward past the whitespace to the start of the NEXT word.
-  // Snapping backward here would glue the chord to the end of the previous word instead
-  // (e.g. "POR[C] QUE" instead of the intended "POR [C]QUE").
+  // Resolves the column a chord lands on. If `col` lands exactly on whitespace (the gap
+  // between words — very common, since chord sheets are typically typed with the chord
+  // centered in the blank space before the syllable it belongs to), skip forward past the
+  // whitespace to the start of the next word — leaving it on the space would glue the
+  // chord to the end of the PREVIOUS word instead (e.g. "POR[C] QUE" instead of the
+  // intended "POR [C]QUE"). Otherwise the column is trusted as-is, mid-word included:
+  // chord sheets legitimately place a chord partway through a word for a held syllable
+  // (e.g. "re[G]lieved", "salvas -[D]te"), and snapping those back to the word's start
+  // would quietly destroy that precision.
   function snapToWordStart(chars, col){
     if(col <= 0) return 0;
     if(col >= chars.length) return chars.length;
@@ -509,9 +511,7 @@
       while(k < chars.length && chars[k] === ' '){ k++; }
       return k;
     }
-    var j = col;
-    while(j > 0 && chars[j-1] !== ' '){ j--; }
-    return j;
+    return col;
   }
   function convertChordSheet(raw){
     var lines = String(raw).replace(/\r\n/g, "\n").split("\n");
@@ -525,17 +525,32 @@
         i++; continue;
       }
       if(isChordLine(line)){
-        var chordMatches = [];
-        var re = /\S+/g, m, idx = 0;
-        while((m = re.exec(line))){ chordMatches.push({chord:m[0], col:m.index, idx:idx++}); }
         var nextLine = lines[i+1];
         var lyricAvailable = (i+1 < lines.length) && nextLine.trim() !== "" && !isChordLine(nextLine) && !isLabelLine(nextLine);
-        var lyricLine = lyricAvailable ? nextLine : "";
+        if(!lyricAvailable){
+          // No lyric line to attach these chords to (e.g. a standalone chord-progression
+          // reference line like "E  B  A  E"). Leave it as plain text rather than
+          // collapsing it into meaningless brackets with no lyric underneath.
+          out.push(line);
+          i++;
+          continue;
+        }
+        var chordMatches = [];
+        var re = /\S+/g, m, idx = 0;
+        while((m = re.exec(line))){
+          if(isChordClusterToken(m[0])){
+            // Expand a "+"-joined cluster into its individual chords, all at this same
+            // column — see bracketsToChordOverLyric for why these get written this way.
+            m[0].split("+").forEach(function(part){ chordMatches.push({chord:part, col:m.index, idx:idx++}); });
+          } else {
+            chordMatches.push({chord:m[0], col:m.index, idx:idx++});
+          }
+        }
+        var lyricLine = nextLine;
         var chars = lyricLine.split("");
         // Chord sheets are typed with the chord's character column roughly matching the
         // lyric character column it sits above — the standard plain-text chord-sheet
-        // convention. Snap each chord's raw column to the nearest word start so it lands
-        // before a whole syllable rather than mid-word.
+        // convention. Snap each chord's raw column to its resolved position.
         chordMatches.forEach(function(cm){
           cm.col = snapToWordStart(chars, Math.min(cm.col, chars.length));
         });
@@ -549,7 +564,7 @@
           chars.splice(pos, 0, insertion);
         });
         out.push(chars.join(""));
-        i += lyricAvailable ? 2 : 1;
+        i += 2;
         continue;
       }
       out.push(line);
@@ -557,48 +572,55 @@
     }
     return out.join("\n");
   }
-  // Heuristic: does this pasted text look like a classic chords-above-lyrics sheet
-  // (as opposed to plain lyrics, or text already using this app's [Chord]lyric format)?
-  function looksLikeChordSheet(text){
-    if(/\[[A-G][^\]]*\]/.test(text)) return false; // already in bracket format
-    var lines = String(text).replace(/\r\n/g, "\n").split("\n");
-    var nonEmpty = lines.filter(function(l){ return l.trim() !== ""; });
-    if(nonEmpty.length < 2) return false;
-    var chordLineCount = nonEmpty.filter(isChordLine).length;
-    return chordLineCount >= 2 && (chordLineCount / nonEmpty.length) >= 0.3;
-  }
-  function commonPrefixLen(a, b){
-    var n = Math.min(a.length, b.length), i = 0;
-    while(i < n && a[i] === b[i]) i++;
-    return i;
-  }
-  function commonSuffixLen(a, b, maxLen){
-    var n = Math.min(a.length, b.length, maxLen);
-    var i = 0;
-    while(i < n && a[a.length-1-i] === b[b.length-1-i]) i++;
-    return i;
-  }
-  // Diffs the textarea's current value against the last snapshot to find what was just
-  // inserted (works for any insertion method: paste, drag-drop, IME, mobile "Paste" bubble).
-  // If that inserted chunk looks like a chord sheet, converts just that chunk in place.
-  function diffAndMaybeConvertContent(textarea){
-    var oldVal = EDIT_CONTENT_SNAPSHOT || "";
-    var newVal = textarea.value;
-    if(newVal === oldVal) return;
-    var prefixLen = commonPrefixLen(oldVal, newVal);
-    var maxSuffix = Math.min(oldVal.length - prefixLen, newVal.length - prefixLen);
-    var suffixLen = commonSuffixLen(oldVal, newVal, maxSuffix);
-    var inserted = newVal.substring(prefixLen, newVal.length - suffixLen);
-    if(inserted.length >= 12 && inserted.indexOf("\n") > -1 && looksLikeChordSheet(inserted)){
-      var converted = convertChordSheet(inserted);
-      var rebuilt = newVal.slice(0, prefixLen) + converted + newVal.slice(newVal.length - suffixLen);
-      var caret = prefixLen + converted.length;
-      textarea.value = rebuilt;
-      if(textarea.setSelectionRange){ textarea.setSelectionRange(caret, caret); }
-      EDIT_CONTENT_SNAPSHOT = rebuilt;
-      return;
-    }
-    EDIT_CONTENT_SNAPSHOT = newVal;
+  // The inverse of convertChordSheet: takes this app's storage format ([Chord]lyric,
+  // inline brackets) and expands it back into a plain two-line chord-over-lyric sheet —
+  // chord line above, lyric line below — for display in the edit textarea. Section
+  // headers ("## ..."), blank lines, and plain lyric-only lines pass through untouched.
+  function bracketsToChordOverLyric(content){
+    var lines = String(content||"").replace(/\r\n/g, "\n").split("\n");
+    var out = [];
+    lines.forEach(function(line){
+      if(/^##\s+/.test(line) || line.trim() === "" || line.indexOf("[") === -1){
+        out.push(line);
+        return;
+      }
+      var tokens = line.split(/\[([^\]]+)\]/);
+      // Build a flat list of text/chord parts first (folding non-chord brackets like
+      // "[Final]" back in as literal text) so we can tell which chords are genuinely
+      // back-to-back with nothing between them — those are a stack meant for one word/
+      // beat (e.g. "[D][C]Jesús") and get written as a single "D+C" cluster token below,
+      // rather than as separate columns that would otherwise fight for the same spot.
+      var parts = [{ type:"text", value: tokens[0] || "" }];
+      for(var i=1;i<tokens.length;i+=2){
+        if(isChordToken(tokens[i])){ parts.push({ type:"chord", value: tokens[i] }); }
+        else { parts.push({ type:"text", value: "[" + tokens[i] + "]" }); }
+        var after = tokens[i+1] || "";
+        if(after !== "" || parts[parts.length-1].type !== "chord"){ parts.push({ type:"text", value: after }); }
+      }
+      var lyricPlain = "";
+      var chordPositions = [];
+      var p = 0;
+      while(p < parts.length){
+        if(parts[p].type === "text"){ lyricPlain += parts[p].value; p++; continue; }
+        var col = lyricPlain.length;
+        var cluster = [parts[p].value];
+        p++;
+        while(p < parts.length && parts[p].type === "chord"){ cluster.push(parts[p].value); p++; }
+        chordPositions.push({ chord: cluster.join("+"), col: col });
+      }
+      var chordChars = [];
+      var cursor = 0;
+      chordPositions.forEach(function(cp){
+        var col = Math.max(cp.col, cursor);
+        while(chordChars.length < col){ chordChars.push(" "); }
+        for(var k=0;k<cp.chord.length;k++){ chordChars[col+k] = cp.chord[k]; }
+        cursor = col + cp.chord.length + 1; // at least one space before the next chord
+      });
+      var chordLine = chordChars.join("");
+      if(chordLine.trim() !== ""){ out.push(chordLine); }
+      out.push(lyricPlain);
+    });
+    return out.join("\n");
   }
 
   /* ============ BULK IMPORT ============ */
@@ -870,20 +892,10 @@
         '</label>'+
       '</div>'+
       '<div class="edit-body">'+
-        '<div class="edit-hint">Start a line with <code>## </code> for a section title (e.g. <code>## Verse 1</code>). Put chords in brackets right before the syllable, like <code>[G]Amazing [C]grace</code>. Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>. '+
-          '<button type="button" class="add-link" data-action="toggle-chord-import" style="border:none;background:none;color:var(--blue);font-weight:600;cursor:pointer;padding:0;font-size:12.5px;">'+(UISTATE.showChordImport ? "Hide chord-sheet paste" : "Paste a chord sheet instead")+'</button>'+
-        '</div>'+
-        (UISTATE.showChordImport ? (
-          '<div class="edit-hint" style="background:#eef2f8;">'+
-            'Paste a normal chord sheet below (chords on their own line above the lyrics, like <code>G&nbsp;&nbsp;&nbsp;&nbsp;C</code> over <code>Amazing grace</code>) and we\'ll convert it to this song\'s format.'+
-          '</div>'+
-          '<textarea id="chord-import-input" spellcheck="false" placeholder="Paste your chord sheet here..." style="min-height:160px;"></textarea>'+
-          '<div style="display:flex;gap:10px;">'+
-            '<button class="btn btn-primary" data-action="convert-chord-sheet">Convert &amp; Insert</button>'+
-            '<button class="btn btn-secondary" data-action="toggle-chord-import">Cancel</button>'+
-          '</div>'
-        ) : '')+
-        '<textarea data-field="content" spellcheck="false">'+escapeHtml(song.content)+'</textarea>'+
+        (song.format === "chords"
+          ? '<div class="edit-hint">Put each chord on its own line, positioned above the syllable it plays on — just like a normal chord chart. Start a section with <code>## Verse 1</code>. Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>. Paste a chord sheet from anywhere and it\'ll line up automatically.</div>'
+          : '<div class="edit-hint">Start a line with <code>## </code> for a section title (e.g. <code>## Verse 1</code>). Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>.</div>')+
+        '<textarea data-field="content" spellcheck="false">'+escapeHtml(song.format === "chords" ? bracketsToChordOverLyric(song.content) : song.content)+'</textarea>'+
       '</div>'+
       '<div class="edit-footer">'+
         '<div class="left-actions"><label><input type="checkbox" data-field="inProgress"'+(song.inProgress?" checked":"")+'> Mark as in progress</label></div>'+
@@ -1345,25 +1357,7 @@
     UISTATE.editingId = id;
     DB.ui.view = "edit";
     UISTATE.menuOpen = false;
-    UISTATE.showChordImport = false;
-    var s = findSong(id);
-    EDIT_CONTENT_SNAPSHOT = s ? s.content : "";
     render();
-  }
-
-  function convertChordSheetIntoEditor(){
-    var importEl = document.getElementById("chord-import-input");
-    var raw = importEl ? importEl.value : "";
-    if(!raw.trim()){ UISTATE.showChordImport = false; render(); return; }
-    var converted = convertChordSheet(raw);
-    var contentEl = document.querySelector('[data-field="content"]');
-    var existing = contentEl ? contentEl.value.trim() : "";
-    var merged = normalizeSongContent(existing ? (existing + "\n\n" + converted) : converted);
-    UISTATE.showChordImport = false;
-    render();
-    var newContentEl = document.querySelector('[data-field="content"]');
-    if(newContentEl){ newContentEl.value = merged; }
-    EDIT_CONTENT_SNAPSHOT = merged;
   }
 
   function createNewSong(){
@@ -1395,7 +1389,15 @@
       if(titleEl){ s.title = titleEl.value.trim() || "Untitled Song"; rpcParams.p_title = s.title; changed = true; }
       if(formatEl){ s.format = formatEl.value; rpcParams.p_format = s.format; changed = true; }
       if(keyEl && keyEl.value !== s.originalKey){ s.originalKey = keyEl.value; s.currentKey = keyEl.value; rpcParams.p_original_key = s.originalKey; rpcParams.p_current_key = s.currentKey; changed = true; }
-      if(contentEl){ s.content = normalizeSongContent(contentEl.value); rpcParams.p_content = s.content; changed = true; }
+      if(contentEl){
+        // The textarea shows plain chord-over-lyric text for "chords" format songs (see
+        // renderEditView), so convert it back into this app's [Chord]lyric storage format
+        // before saving. "lyrics" format has no chord lines to convert — save as typed.
+        var raw = contentEl.value;
+        s.content = normalizeSongContent(s.format === "chords" ? convertChordSheet(raw) : raw);
+        rpcParams.p_content = s.content;
+        changed = true;
+      }
       if(inProgEl){ s.inProgress = inProgEl.checked; rpcParams.p_in_progress = s.inProgress; changed = true; }
     }
     DB.ui.currentSongId = s.id;
@@ -1569,11 +1571,8 @@
       case "switch-songbook": doSwitchSongbook(); break;
 
       case "save-song": saveSongFromForm(); break;
-      case "cancel-edit": DB.ui.view = "song"; UISTATE.showChordImport = false; render(); break;
+      case "cancel-edit": DB.ui.view = "song"; render(); break;
       case "delete-song": deleteSongAction(); break;
-
-      case "toggle-chord-import": UISTATE.showChordImport = !UISTATE.showChordImport; render(); break;
-      case "convert-chord-sheet": convertChordSheetIntoEditor(); break;
 
       case "search-clear": UISTATE.search=""; render(); break;
 
@@ -1613,9 +1612,6 @@
       var input = document.querySelector('[data-action="search-input"]');
       if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
       return;
-    }
-    if(e.target.getAttribute("data-field") === "content"){
-      diffAndMaybeConvertContent(e.target);
     }
   });
 
