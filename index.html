@@ -472,6 +472,29 @@
     if(isChordLine(line)) return false;
     return /^[A-ZÀ-Ý0-9][A-ZÀ-Ý0-9\s]*:$/.test(t);
   }
+  // Keeps saved song content tidy regardless of how it got typed/pasted/edited: no blank
+  // line directly under a "## Section" header (renders as dead space at the top of the
+  // section), no runs of 2+ blank lines back to back, and no leading/trailing blank lines.
+  // A single blank line between two content lines elsewhere is left alone — that's a
+  // deliberate visual break within a section, not a bug.
+  function normalizeSongContent(text){
+    var lines = String(text||"").replace(/\r\n/g, "\n").split("\n");
+    var out = [];
+    for(var i=0;i<lines.length;i++){
+      var line = lines[i];
+      if(line.trim() === ""){
+        if(out.length === 0) continue;
+        var prev = out[out.length-1];
+        if(prev.trim() === "") continue;
+        if(/^##\s+/.test(prev)) continue;
+        out.push("");
+      } else {
+        out.push(line);
+      }
+    }
+    while(out.length && out[out.length-1].trim() === ""){ out.pop(); }
+    return out.join("\n");
+  }
   // Finds the start of the word that column `col` falls inside (or on). If `col` lands
   // exactly on whitespace (the gap between words — very common, since chord sheets are
   // typically typed with the chord centered in the blank space before the syllable it
@@ -635,6 +658,7 @@
       while(contentLines.length && contentLines[contentLines.length-1].trim() === "") contentLines.pop();
       var content = contentLines.join("\n");
       if(looksLikeChordSheetLenient(content)){ content = convertChordSheet(content); }
+      content = normalizeSongContent(content);
       var key = normalizeKeyInput(b.key);
       return {
         title: b.title.trim() || "Untitled Song",
@@ -1334,7 +1358,7 @@
     var converted = convertChordSheet(raw);
     var contentEl = document.querySelector('[data-field="content"]');
     var existing = contentEl ? contentEl.value.trim() : "";
-    var merged = existing ? (existing + "\n\n" + converted) : converted;
+    var merged = normalizeSongContent(existing ? (existing + "\n\n" + converted) : converted);
     UISTATE.showChordImport = false;
     render();
     var newContentEl = document.querySelector('[data-field="content"]');
@@ -1346,7 +1370,7 @@
     if(!isOwner()) return;
     sb.rpc("create_song", {
       p_space_id: SPACE_CODE, p_secret: OWNER_SECRET, p_title:"Untitled Song", p_original_key:"C",
-      p_format:"chords", p_content:"## Verse 1\n[C]Type your lyrics and [G]chords here", p_in_progress:true
+      p_format:"chords", p_content: normalizeSongContent("## Verse 1\n[C]Type your lyrics and [G]chords here"), p_in_progress:true
     }).then(function(res){
       if(res.error){ console.error(res.error); return; }
       var s = rowToSong(res.data);
@@ -1371,7 +1395,7 @@
       if(titleEl){ s.title = titleEl.value.trim() || "Untitled Song"; rpcParams.p_title = s.title; changed = true; }
       if(formatEl){ s.format = formatEl.value; rpcParams.p_format = s.format; changed = true; }
       if(keyEl && keyEl.value !== s.originalKey){ s.originalKey = keyEl.value; s.currentKey = keyEl.value; rpcParams.p_original_key = s.originalKey; rpcParams.p_current_key = s.currentKey; changed = true; }
-      if(contentEl){ s.content = contentEl.value; rpcParams.p_content = s.content; changed = true; }
+      if(contentEl){ s.content = normalizeSongContent(contentEl.value); rpcParams.p_content = s.content; changed = true; }
       if(inProgEl){ s.inProgress = inProgEl.checked; rpcParams.p_in_progress = s.inProgress; changed = true; }
     }
     DB.ui.currentSongId = s.id;
