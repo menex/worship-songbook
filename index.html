@@ -131,6 +131,8 @@
   .chord-pair .chord{position:absolute;top:0;left:0;color:var(--blue);font-weight:700;font-size:var(--chord-size);white-space:nowrap;}
   .chord-pair .lyric{white-space:pre;}
   .lyric-only-line{white-space:pre-wrap;font-size:var(--lyric-size);}
+  .chord-only-line{white-space:normal;}
+  .chord-badge{display:inline-block;color:var(--blue);font-weight:700;font-size:var(--chord-size);margin-right:.85em;}
 
   /* ---------- Edit screen ---------- */
   .edit-meta{
@@ -754,6 +756,19 @@
       if(song.format === "lyrics"){
         var plain = line.replace(/\[([^\]]+)\]/g,"");
         html += '<div class="lyric-line lyric-only-line">'+applyBold(plain)+'</div>';
+        return;
+      }
+      // A standalone chord-progression line (e.g. an instrumental cue like "G  D  Am  C")
+      // has no lyric underneath it to attach brackets to, so it's stored as plain text.
+      // Render it as a row of highlighted chord badges instead of plain lyric text.
+      if(line.indexOf("[") === -1 && isChordLine(line)){
+        var badges = line.trim().split(/\s+/).map(function(tok){
+          var parts = tok.split("+");
+          return parts.map(function(part){
+            return '<span class="chord-badge">'+escapeHtml(transposeChord(part, semis, useFlats))+'</span>';
+          }).join("");
+        }).join("");
+        html += '<div class="lyric-line chord-only-line">'+badges+'</div>';
         return;
       }
       var tokens = line.split(/\[([^\]]+)\]/);
