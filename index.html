@@ -116,6 +116,11 @@
   .content-area{flex:1;overflow-y:auto;position:relative;}
   .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);gap:14px;padding:40px;text-align:center;}
   .empty-state button{background:var(--navy);color:#fff;border:none;padding:12px 22px;border-radius:24px;font-size:15px;cursor:pointer;}
+  /* In landscape (typically a tablet on a stand), fitSongToViewport() scales .song-fit-inner
+     down (via JS-measured transform) so the whole song is visible without scrolling — see
+     that function for why this needs JS rather than pure CSS. In portrait it's a no-op and
+     .content-area scrolls normally. */
+  .song-fit-outer{position:relative;height:100%;}
 
   .song-content{
     columns: 300px 3;
@@ -354,6 +359,72 @@
   if(typeof document !== "undefined"){
     document.addEventListener("visibilitychange", function(){
       if(document.visibilityState === "visible" && APP_STAGE === "app"){ requestWakeLock(); }
+    });
+  }
+
+  // Landscape "fit to screen": scale the whole song down (or up, capped) so it's fully
+  // visible with no scrolling — the point of a tablet propped on a stand during a set.
+  // Portrait keeps the normal scrollable multi-column layout untouched.
+  var FIT_MIN_SCALE = 0.5;
+  var FIT_MAX_SCALE = 1;
+  function isLandscapeOrientation(){
+    try{
+      if(window.matchMedia){ return window.matchMedia("(orientation: landscape)").matches; }
+    }catch(e){}
+    return window.innerWidth > window.innerHeight;
+  }
+  function fitSongToViewport(){
+    var outer = document.querySelector(".song-fit-outer");
+    var inner = document.querySelector(".song-fit-inner");
+    if(!outer || !inner) return;
+    if(DB.ui.view !== "song" || !isLandscapeOrientation()){
+      inner.style.position = "";
+      inner.style.top = "";
+      inner.style.left = "";
+      inner.style.width = "";
+      inner.style.transform = "";
+      outer.style.overflow = "";
+      return;
+    }
+    // Measure the song's natural (unscaled) size in normal document flow first, with an
+    // explicit pixel width locked in — an absolutely positioned box with width:auto can
+    // shrink-to-fit differently than the flowed box we're about to measure, which would
+    // throw off the CSS column layout's width and make the scale calculation wrong.
+    var availW = outer.clientWidth;
+    var availH = outer.clientHeight;
+    if(!availW || !availH) return;
+    inner.style.position = "static";
+    inner.style.transform = "none";
+    inner.style.width = availW + "px";
+    var naturalW = inner.scrollWidth;
+    var naturalH = inner.scrollHeight;
+    if(!naturalW || !naturalH) return;
+    var scale = Math.min(FIT_MAX_SCALE, availW / naturalW, availH / naturalH);
+    if(scale < FIT_MIN_SCALE){
+      // Song is too long to fit even at the smallest readable size — fall back to
+      // scrolling at the floor scale rather than shrinking the text further.
+      scale = FIT_MIN_SCALE;
+      outer.style.overflow = "auto";
+    } else {
+      outer.style.overflow = "hidden";
+    }
+    var offsetX = Math.max(0, (availW - naturalW * scale) / 2);
+    var offsetY = Math.max(0, (availH - naturalH * scale) / 2);
+    inner.style.position = "absolute";
+    inner.style.top = "0";
+    inner.style.left = "0";
+    inner.style.transformOrigin = "top left";
+    inner.style.transform = "translate(" + offsetX + "px," + offsetY + "px) scale(" + scale + ")";
+  }
+  var fitResizeTimer = null;
+  if(typeof window !== "undefined"){
+    window.addEventListener("resize", function(){
+      clearTimeout(fitResizeTimer);
+      fitResizeTimer = setTimeout(fitSongToViewport, 120);
+    });
+    window.addEventListener("orientationchange", function(){
+      clearTimeout(fitResizeTimer);
+      fitResizeTimer = setTimeout(fitSongToViewport, 120);
     });
   }
 
@@ -883,9 +954,9 @@
         (isOwner() ? '<button data-action="new-song">+ New Song</button>' : '')+
       '</div></div>';
     }
-    return '<div class="content-area"><div class="song-content">'+
+    return '<div class="content-area"><div class="song-fit-outer"><div class="song-fit-inner"><div class="song-content">'+
       parseAndRenderContent(song, getDisplayKey(song))+
-    '</div></div>';
+    '</div></div></div></div>';
   }
 
   /* ============ RENDER: EDIT VIEW ============ */
@@ -1129,6 +1200,8 @@
     app.innerHTML = renderHeader() + body + renderMenu() + renderModal();
     applyColumnSetting();
     requestWakeLock();
+    // rAF so the column layout above has actually been laid out before we measure it.
+    requestAnimationFrame(fitSongToViewport);
     if(SPACE_CODE && DB){
       safeSet(cacheKey(SPACE_CODE), JSON.stringify(DB));
     }
