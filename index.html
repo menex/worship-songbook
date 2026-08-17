@@ -24,6 +24,14 @@
       var s = localStorage.getItem("songbookTextSize");
       if(s === "sm" || s === "lg"){ document.documentElement.setAttribute("data-textsize", s); }
     }catch(e){}
+    try{
+      var c = localStorage.getItem("songbookChordSize");
+      if(c === "sm" || c === "lg"){ document.documentElement.setAttribute("data-chordsize", c); }
+    }catch(e){}
+    try{
+      var l = localStorage.getItem("songbookLineSpacing");
+      if(l === "tight" || l === "relaxed"){ document.documentElement.setAttribute("data-linespacing", l); }
+    }catch(e){}
   })();
 </script>
 <style>
@@ -53,10 +61,17 @@
     --lyric-size:17px;
     --chord-size:14px;
     --section-size:16px;
+    --lyric-line-height:2.1;
     color-scheme:light;
   }
-  html[data-textsize="sm"]{ --lyric-size:15px; --chord-size:12.5px; --section-size:14px; }
-  html[data-textsize="lg"]{ --lyric-size:20px; --chord-size:16.5px; --section-size:19px; }
+  html[data-textsize="sm"]{ --lyric-size:15px; --section-size:14px; }
+  html[data-textsize="lg"]{ --lyric-size:20px; --section-size:19px; }
+  /* Chord size and line spacing are independent of the overall text size above — a
+     capo'd-out song might want small compact lyrics but big, easy-to-spot chords. */
+  html[data-chordsize="sm"]{ --chord-size:12.5px; }
+  html[data-chordsize="lg"]{ --chord-size:16.5px; }
+  html[data-linespacing="tight"]{ --lyric-line-height:1.6; }
+  html[data-linespacing="relaxed"]{ --lyric-line-height:2.6; }
   html[data-theme="dark"]{
     --dark:#e7e9ec;
     --navy:#6fa0e6;
@@ -130,7 +145,7 @@
   }
   .song-section{break-inside:avoid;margin-bottom:34px;}
   .section-label{font-weight:800;font-size:var(--section-size);letter-spacing:.4px;margin-bottom:14px;text-transform:uppercase;}
-  .lyric-line{margin-bottom:6px;line-height:2.1;white-space:normal;font-size:var(--lyric-size);}
+  .lyric-line{margin-bottom:6px;line-height:var(--lyric-line-height);white-space:normal;font-size:var(--lyric-size);}
   .lyric-line.blank{height:14px;}
   .chord-pair{display:inline-block;position:relative;padding-top:1.15em;vertical-align:bottom;}
   .chord-pair .chord{position:absolute;top:0;left:0;color:var(--blue);font-weight:700;font-size:var(--chord-size);white-space:nowrap;}
@@ -333,6 +348,28 @@
     if(size === "sm" || size === "lg"){ document.documentElement.setAttribute("data-textsize", size); }
     else { document.documentElement.removeAttribute("data-textsize"); }
     safeSet(TEXTSIZE_STORAGE_KEY, size);
+  }
+
+  var CHORDSIZE_STORAGE_KEY = "songbookChordSize";
+  function currentChordSize(){
+    var a = document.documentElement.getAttribute("data-chordsize");
+    return (a === "sm" || a === "lg") ? a : "md";
+  }
+  function applyChordSize(size){
+    if(size === "sm" || size === "lg"){ document.documentElement.setAttribute("data-chordsize", size); }
+    else { document.documentElement.removeAttribute("data-chordsize"); }
+    safeSet(CHORDSIZE_STORAGE_KEY, size);
+  }
+
+  var LINESPACING_STORAGE_KEY = "songbookLineSpacing";
+  function currentLineSpacing(){
+    var a = document.documentElement.getAttribute("data-linespacing");
+    return (a === "tight" || a === "relaxed") ? a : "normal";
+  }
+  function applyLineSpacing(spacing){
+    if(spacing === "tight" || spacing === "relaxed"){ document.documentElement.setAttribute("data-linespacing", spacing); }
+    else { document.documentElement.removeAttribute("data-linespacing"); }
+    safeSet(LINESPACING_STORAGE_KEY, spacing);
   }
 
   // Screen Wake Lock: keeps the tablet's display from sleeping while the songbook is open —
@@ -1183,6 +1220,18 @@
             '<button type="button" data-action="set-textsize" data-size="md" class="'+(currentTextSize()==="md"?"active":"")+'">Medium</button>'+
             '<button type="button" data-action="set-textsize" data-size="lg" class="'+(currentTextSize()==="lg"?"active":"")+'">Large</button>'+
           '</div>'+
+          '<span class="field-row-label">Chord size</span>'+
+          '<div class="segmented">'+
+            '<button type="button" data-action="set-chordsize" data-size="sm" class="'+(currentChordSize()==="sm"?"active":"")+'">Small</button>'+
+            '<button type="button" data-action="set-chordsize" data-size="md" class="'+(currentChordSize()==="md"?"active":"")+'">Medium</button>'+
+            '<button type="button" data-action="set-chordsize" data-size="lg" class="'+(currentChordSize()==="lg"?"active":"")+'">Large</button>'+
+          '</div>'+
+          '<span class="field-row-label">Line spacing</span>'+
+          '<div class="segmented">'+
+            '<button type="button" data-action="set-linespacing" data-spacing="tight" class="'+(currentLineSpacing()==="tight"?"active":"")+'">Compact</button>'+
+            '<button type="button" data-action="set-linespacing" data-spacing="normal" class="'+(currentLineSpacing()==="normal"?"active":"")+'">Normal</button>'+
+            '<button type="button" data-action="set-linespacing" data-spacing="relaxed" class="'+(currentLineSpacing()==="relaxed"?"active":"")+'">Relaxed</button>'+
+          '</div>'+
           '<label style="font-size:13px;color:var(--muted);">Columns</label>'+
           '<select id="set-columns">'+
             '<option value="auto"'+(UISTATE.columns!=="1"?" selected":"")+'>Auto</option>'+
@@ -1678,6 +1727,8 @@
       case "key-down": adjustKey(-1); break;
       case "open-settings": UISTATE.modal = {type:"settings"}; render(); break;
       case "set-textsize": applyTextSize(el.getAttribute("data-size")); render(); break;
+      case "set-chordsize": applyChordSize(el.getAttribute("data-size")); render(); break;
+      case "set-linespacing": applyLineSpacing(el.getAttribute("data-spacing")); render(); break;
       case "close-modal": UISTATE.modal = null; render(); break;
       case "copy-code": copyCodeToClipboard(); break;
       case "copy-owner-key": copyOwnerKeyToClipboard(); break;
