@@ -416,15 +416,22 @@
     inner.style.transformOrigin = "top left";
     inner.style.transform = "translate(" + offsetX + "px," + offsetY + "px) scale(" + scale + ")";
   }
+  function refitSongLayout(){
+    // Column count depends on the width available at this exact moment, so it has to be
+    // recomputed before every fit pass — a resize/rotation can change how many columns
+    // fit, which in turn changes the natural height fitSongToViewport measures.
+    applyColumnSetting();
+    fitSongToViewport();
+  }
   var fitResizeTimer = null;
   if(typeof window !== "undefined"){
     window.addEventListener("resize", function(){
       clearTimeout(fitResizeTimer);
-      fitResizeTimer = setTimeout(fitSongToViewport, 120);
+      fitResizeTimer = setTimeout(refitSongLayout, 120);
     });
     window.addEventListener("orientationchange", function(){
       clearTimeout(fitResizeTimer);
-      fitResizeTimer = setTimeout(fitSongToViewport, 120);
+      fitResizeTimer = setTimeout(refitSongLayout, 120);
     });
   }
 
@@ -1207,9 +1214,29 @@
     }
   }
 
+  // CSS's own column-balancing ("as many columns as fit, up to the max, balanced by
+  // content") can under-use columns — e.g. settle for 2 wide ones when a 3rd would've
+  // fit and left everything roomier. So instead of leaving that to the browser, work out
+  // exactly how many SONG_COL_MIN_WIDTH-or-wider columns actually fit in the available
+  // space and force that count directly. Runs on every render (and again from
+  // fitSongToViewport on resize/rotate), so a song always uses every column it can.
+  var SONG_COL_MIN_WIDTH = 300;
+  var SONG_COL_MAX = 4;
   function applyColumnSetting(){
     var el = document.querySelector(".song-content");
-    if(el && UISTATE.columns === "1"){ el.style.columns = "1"; }
+    if(!el) return;
+    if(UISTATE.columns === "1"){
+      el.style.columnWidth = "auto";
+      el.style.columnCount = "1";
+      return;
+    }
+    var container = el.closest(".song-fit-outer") || el.parentElement;
+    var availW = container ? container.clientWidth : 0;
+    if(!availW){ el.style.columnWidth = ""; el.style.columnCount = ""; return; }
+    var gap = parseFloat(getComputedStyle(el).columnGap) || 48;
+    var count = Math.max(1, Math.min(SONG_COL_MAX, Math.floor((availW + gap) / (SONG_COL_MIN_WIDTH + gap))));
+    el.style.columnWidth = "auto";
+    el.style.columnCount = String(count);
   }
 
   /* ============ SPACE / SYNC ============ */
