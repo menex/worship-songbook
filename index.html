@@ -223,6 +223,11 @@
   .menu-row .mini-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;min-width:36px;min-height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
   .menu-row .mini-btn:hover{color:var(--text);background:var(--surface-hover);}
   .menu-row .mini-btn svg{width:16px;height:16px;}
+  .setlist-row{position:relative;}
+  .setlist-row.dragging{opacity:.6;background:var(--surface-hover);z-index:5;}
+  .drag-handle{cursor:grab;touch-action:none;min-width:32px;min-height:36px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+  .drag-handle:active{cursor:grabbing;}
+  .drag-handle svg{width:16px;height:16px;}
   .lib-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface-hover);cursor:pointer;min-height:36px;}
   .lib-row:hover .row-title{text-decoration:underline;}
   .lib-row .row-title{color:var(--text);font-size:16px;}
@@ -911,7 +916,8 @@
     gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     up:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 6l7 10H5z"/></svg>',
     down:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 18L5 8h14z"/></svg>',
-    x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>'
+    x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>',
+    drag:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'
   };
 
   /* ============ RENDER: GATE / LOADING ============ */
@@ -1051,7 +1057,8 @@
     var setlistRows = DB.setlist.items.map(function(item, idx){
       var s = findSong(item.songId);
       if(!s) return "";
-      return '<div class="menu-row">'+
+      return '<div class="menu-row setlist-row" data-orig-idx="'+idx+'">'+
+        (isOwner() ? '<span class="drag-handle" data-drag="1">'+ICONS.drag+'</span>' : '')+
         '<span class="idx">'+(idx+1)+'.</span>'+
         '<span class="row-title" data-action="open-song" data-id="'+s.id+'">'+escapeHtml(s.title)+'</span>'+
         '<span class="key-badge">'+s.currentKey+'</span>'+
@@ -1106,7 +1113,7 @@
         ) : '')+
         '<div class="menu-section">'+
           '<div class="menu-section-head"><h3>'+escapeHtml(DB.setlist.name)+'</h3>'+(isOwner() ? '<button class="add-link" data-action="open-picker-setlist">+ Add</button>' : '')+'</div>'+
-          (setlistRows || '<div class="menu-empty">No songs added yet.</div>')+
+          '<div id="setlistRows">'+(setlistRows || '<div class="menu-empty">No songs added yet.</div>')+'</div>'+
         '</div>'+
         '<div class="menu-section">'+
           '<div class="menu-section-head"><h3>New Songs in Progress</h3>'+(isOwner() ? '<button class="add-link" data-action="open-picker-progress">+ Add</button>' : '')+'</div>'+
@@ -1258,8 +1265,93 @@
     requestWakeLock();
     // rAF so the column layout above has actually been laid out before we measure it.
     requestAnimationFrame(fitSongToViewport);
+    attachSetlistDragHandlers();
     if(SPACE_CODE && DB){
       safeSet(cacheKey(SPACE_CODE), JSON.stringify(DB));
+    }
+  }
+
+  /* ============ SETLIST: DRAG-TO-REORDER ============ */
+  // Pointer-events based (works for mouse + touch) so users can drag the
+  // grip handle on a setlist row to reorder it, in addition to the
+  // up/down/remove buttons. Reordering happens purely in the DOM while
+  // dragging (no re-render, so drag stays smooth); on drop we read the
+  // final DOM order back into DB.setlist.items and persist positions.
+  var SETLIST_DRAG = null;
+  function attachSetlistDragHandlers(){
+    var container = document.getElementById("setlistRows");
+    if(!container) return;
+    var handles = container.querySelectorAll(".drag-handle");
+    for(var i=0;i<handles.length;i++){
+      handles[i].addEventListener("pointerdown", onSetlistDragStart);
+    }
+  }
+  function onSetlistDragStart(e){
+    if(!isOwner()) return;
+    if(e.button !== undefined && e.button !== 0) return;
+    var handle = e.currentTarget;
+    var row = handle.closest(".setlist-row");
+    var container = document.getElementById("setlistRows");
+    if(!row || !container) return;
+    e.preventDefault();
+    SETLIST_DRAG = { row: row, container: container };
+    row.classList.add("dragging");
+    document.addEventListener("pointermove", onSetlistDragMove);
+    document.addEventListener("pointerup", onSetlistDragEnd);
+    document.addEventListener("pointercancel", onSetlistDragEnd);
+  }
+  function onSetlistDragMove(e){
+    if(!SETLIST_DRAG) return;
+    e.preventDefault();
+    var container = SETLIST_DRAG.container;
+    var row = SETLIST_DRAG.row;
+    var y = e.clientY;
+    var rows = Array.prototype.slice.call(container.querySelectorAll(".setlist-row"));
+    for(var i=0;i<rows.length;i++){
+      var r = rows[i];
+      if(r === row) continue;
+      var rect = r.getBoundingClientRect();
+      var mid = rect.top + rect.height/2;
+      if(y < mid){
+        container.insertBefore(row, r);
+        return;
+      }
+    }
+    container.appendChild(row);
+  }
+  function onSetlistDragEnd(){
+    if(!SETLIST_DRAG) return;
+    var row = SETLIST_DRAG.row;
+    var container = SETLIST_DRAG.container;
+    row.classList.remove("dragging");
+    document.removeEventListener("pointermove", onSetlistDragMove);
+    document.removeEventListener("pointerup", onSetlistDragEnd);
+    document.removeEventListener("pointercancel", onSetlistDragEnd);
+    SETLIST_DRAG = null;
+    finalizeSetlistOrder(container);
+  }
+  function finalizeSetlistOrder(container){
+    var rows = Array.prototype.slice.call(container.querySelectorAll(".setlist-row"));
+    var origItems = DB.setlist.items;
+    var newItems = rows.map(function(r){
+      var idx = parseInt(r.getAttribute("data-orig-idx"), 10);
+      return origItems[idx];
+    }).filter(Boolean);
+    var changed = [];
+    newItems.forEach(function(it, i){
+      if(it.position !== i){
+        it.position = i;
+        changed.push(it);
+      }
+    });
+    DB.setlist.items = newItems;
+    render();
+    if(changed.length && isOwner()){
+      Promise.all(changed.map(function(it){
+        return sb.rpc("update_setlist_item_position", {p_space_id:SPACE_CODE, p_secret:OWNER_SECRET, p_item_id:it.id, p_position:it.position});
+      })).then(function(results){
+        results.forEach(function(r){ if(r.error) console.error(r.error); });
+      });
     }
   }
 
