@@ -1266,9 +1266,66 @@
     // rAF so the column layout above has actually been laid out before we measure it.
     requestAnimationFrame(fitSongToViewport);
     attachSetlistDragHandlers();
+    attachSongSwipeHandlers();
     if(SPACE_CODE && DB){
       safeSet(cacheKey(SPACE_CODE), JSON.stringify(DB));
     }
+  }
+
+  /* ============ SETLIST: SWIPE TO NAVIGATE ============ */
+  // While viewing a song that's part of the Sunday SET LIST, a horizontal
+  // swipe on the song content moves to the next/previous song in the exact
+  // order assigned in the set list (swipe left = next, swipe right = previous).
+  // No-op for songs opened outside the set list, and stops at either end
+  // rather than wrapping around.
+  var SONG_SWIPE_START = null;
+  var SWIPE_MIN_DIST = 60;
+  var SWIPE_MAX_OFF_AXIS_RATIO = 0.6;
+  var SWIPE_MAX_DURATION_MS = 800;
+  function attachSongSwipeHandlers(){
+    var el = document.querySelector(".content-area");
+    if(!el) return;
+    el.addEventListener("touchstart", onSongTouchStart, {passive:true});
+    el.addEventListener("touchend", onSongTouchEnd, {passive:true});
+    el.addEventListener("touchcancel", onSongTouchCancel, {passive:true});
+  }
+  function onSongTouchStart(e){
+    if(DB.ui.view !== "song" || e.touches.length !== 1){ SONG_SWIPE_START = null; return; }
+    var t = e.touches[0];
+    SONG_SWIPE_START = { x: t.clientX, y: t.clientY, time: Date.now() };
+  }
+  function onSongTouchCancel(){ SONG_SWIPE_START = null; }
+  function onSongTouchEnd(e){
+    var start = SONG_SWIPE_START;
+    SONG_SWIPE_START = null;
+    if(!start || DB.ui.view !== "song") return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - start.x;
+    var dy = t.clientY - start.y;
+    var dt = Date.now() - start.time;
+    if(dt > SWIPE_MAX_DURATION_MS) return;
+    if(Math.abs(dx) < SWIPE_MIN_DIST) return;
+    if(Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_OFF_AXIS_RATIO) return;
+    navigateSetlist(dx < 0 ? 1 : -1);
+  }
+  function getCurrentSetlistIndex(){
+    if(!DB.setlist || !DB.ui.currentSongId) return -1;
+    var items = DB.setlist.items;
+    for(var i=0;i<items.length;i++){
+      if(items[i].songId === DB.ui.currentSongId) return i;
+    }
+    return -1;
+  }
+  function navigateSetlist(dir){
+    var idx = getCurrentSetlistIndex();
+    if(idx === -1) return;
+    var j = idx + dir;
+    if(j < 0 || j >= DB.setlist.items.length) return;
+    var s = findSong(DB.setlist.items[j].songId);
+    if(!s) return;
+    DB.ui.currentSongId = s.id;
+    DB.ui.view = "song";
+    render();
   }
 
   /* ============ SETLIST: DRAG-TO-REORDER ============ */
