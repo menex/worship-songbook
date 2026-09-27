@@ -137,21 +137,31 @@
      .content-area scrolls normally. */
   .song-fit-outer{position:relative;height:100%;}
 
-  .song-content{
-    columns: 300px 3;
-    column-gap: 48px;
-    column-rule: 1px solid var(--border);
-    padding: 30px 40px 60px;
+  /* Sections lay out like words in a paragraph: each one is an inline-block that sizes to
+     its OWN natural (unwrapped) width and never breaks internally, so a chord-annotated
+     line always stays on the one line it was written on — matching a real printed chord
+     sheet, where "VERSO" and "CORO" sit side by side only because there's room, not
+     because they were forced into fixed-width columns. When there isn't room for the next
+     section next to the current one, it wraps to a new row automatically, exactly like a
+     word wrapping to the next line of text. markRowDividers() (see fitSongToViewport) tags
+     every section that landed next to a sibling — rather than starting a new row — with
+     .row-divider, which draws the vertical rule between them.
+  */
+  .song-content{ padding: 30px 40px 60px; }
+  .song-content.single-column .song-section{ display:block; margin-right:0 !important; }
+  .song-section{
+    display:inline-block; vertical-align:top; white-space:nowrap;
+    margin:0 48px 34px 0;
   }
-  .song-section{break-inside:avoid;margin-bottom:34px;}
-  .section-label{font-weight:800;font-size:var(--section-size);letter-spacing:.4px;margin-bottom:14px;text-transform:uppercase;}
-  .lyric-line{margin-bottom:6px;line-height:var(--lyric-line-height);white-space:normal;font-size:var(--lyric-size);}
+  .song-section.row-divider{ border-left:1px solid var(--border); padding-left:24px; }
+  .section-label{font-weight:800;font-size:var(--section-size);letter-spacing:.4px;margin-bottom:14px;text-transform:uppercase;white-space:nowrap;}
+  .lyric-line{margin-bottom:6px;line-height:var(--lyric-line-height);white-space:nowrap;font-size:var(--lyric-size);}
   .lyric-line.blank{height:14px;}
   .chord-pair{display:inline-block;position:relative;padding-top:0.55em;vertical-align:bottom;}
   .chord-pair .chord{position:absolute;top:0;left:0;color:var(--blue);font-weight:700;font-size:var(--chord-size);white-space:nowrap;line-height:1;}
   .chord-pair .lyric{white-space:pre;}
-  .lyric-only-line{white-space:pre-wrap;font-size:var(--lyric-size);}
-  .chord-only-line{white-space:normal;}
+  .lyric-only-line{white-space:pre;font-size:var(--lyric-size);}
+  .chord-only-line{white-space:nowrap;}
   .chord-badge{display:inline-block;color:var(--blue);font-weight:700;font-size:var(--chord-size);margin-right:.85em;}
 
   /* ---------- Edit screen ---------- */
@@ -420,6 +430,25 @@
     }catch(e){}
     return window.innerWidth > window.innerHeight;
   }
+  // Each .song-section is an inline-block that sizes to its own natural (nowrap) width —
+  // see the .song-content/.song-section CSS. That means sections wrap onto a new row
+  // automatically, exactly like words wrapping to the next line of a paragraph, purely
+  // from the width they're given; there's no column-count to compute. This walks the
+  // laid-out sections and tags every one that landed next to a sibling (same row) rather
+  // than starting a new row with .row-divider, which draws the vertical rule between them.
+  // Must run AFTER the sections are in the DOM at their final pre-scale width.
+  function markRowDividers(){
+    var contentEl = document.querySelector(".song-content");
+    if(!contentEl) return;
+    var sections = contentEl.querySelectorAll(".song-section");
+    var prevTop = null;
+    for(var i=0;i<sections.length;i++){
+      var top = sections[i].offsetTop;
+      var sameRow = prevTop !== null && Math.abs(top - prevTop) < 2;
+      sections[i].classList.toggle("row-divider", sameRow);
+      prevTop = top;
+    }
+  }
   function fitSongToViewport(){
     var outer = document.querySelector(".song-fit-outer");
     var inner = document.querySelector(".song-fit-inner");
@@ -440,31 +469,34 @@
     // Measure the song's natural (unscaled) size in normal document flow first, with an
     // explicit pixel width locked in — an absolutely positioned box with width:auto can
     // shrink-to-fit differently than the flowed box we're about to measure, which would
-    // throw off the CSS column layout's width and make the scale calculation wrong.
-    //
-    // Measuring at the FULL available width would make naturalW trivially equal availW
-    // every time (the columns box always stretches to fill whatever width it's given),
-    // which forces the width-based scale ratio (availW/naturalW) to always be exactly 1 —
-    // silently capping the whole fit at 100% no matter how much taller the viewport is
-    // than the content, which is why a short song (one verse + one chorus) used to sit
-    // small instead of filling the screen. Measuring instead at the columns' natural
-    // MINIMUM comfortable width (SONG_COL_MIN_WIDTH per column, from applyColumnSetting)
-    // gives a true "how much room does this content actually need" box, so scaling it up
-    // to fill availW/availH is a real enlargement, not a no-op.
-    var colCount = (contentEl && parseInt(contentEl.style.columnCount, 10)) || 1;
-    var measureW = availW;
-    if(contentEl){
-      var contentCS = getComputedStyle(contentEl);
-      var gap = parseFloat(contentCS.columnGap) || 48;
-      var hPad = (parseFloat(contentCS.paddingLeft) || 0) + (parseFloat(contentCS.paddingRight) || 0);
-      var idealW = colCount * SONG_COL_MIN_WIDTH + (colCount - 1) * gap + hPad;
-      measureW = Math.min(idealW, availW);
-    }
+    // throw off the row-wrapping and make the scale calculation wrong. Sections wrap based
+    // on this width, so this doubles as the pass that decides row layout.
     inner.style.position = "static";
     inner.style.transform = "none";
-    inner.style.width = measureW + "px";
-    var naturalW = inner.scrollWidth;
+    inner.style.width = availW + "px";
+    markRowDividers();
     var naturalH = inner.scrollHeight;
+    // The container's own box is fixed at availW, so its scrollWidth is useless for
+    // "how much width does the content actually need" — it floors at availW even when
+    // the sections wrapped into narrow rows that don't use anywhere near the full width
+    // (exactly the case for a short song). Measure the real rightmost extent of the
+    // sections themselves instead, so a short song can scale up to fill BOTH axes rather
+    // than just height.
+    var naturalW = 0;
+    var sections = contentEl ? contentEl.querySelectorAll(".song-section") : [];
+    if(sections.length && contentEl){
+      var contentRect = contentEl.getBoundingClientRect();
+      var contentCS = getComputedStyle(contentEl);
+      var rightPad = parseFloat(contentCS.paddingRight) || 0;
+      var maxRight = 0;
+      for(var i=0;i<sections.length;i++){
+        var r = sections[i].getBoundingClientRect();
+        if(r.right > maxRight) maxRight = r.right;
+      }
+      naturalW = (maxRight - contentRect.left) + rightPad;
+    } else {
+      naturalW = inner.scrollWidth;
+    }
     if(!naturalW || !naturalH) return;
     var scale = Math.min(FIT_MAX_SCALE, availW / naturalW, availH / naturalH);
     if(scale < FIT_MIN_SCALE){
@@ -484,9 +516,6 @@
     inner.style.transform = "translate(" + offsetX + "px," + offsetY + "px) scale(" + scale + ")";
   }
   function refitSongLayout(){
-    // Column count depends on the width available at this exact moment, so it has to be
-    // recomputed before every fit pass — a resize/rotation can change how many columns
-    // fit, which in turn changes the natural height fitSongToViewport measures.
     applyColumnSetting();
     fitSongToViewport();
   }
@@ -1444,54 +1473,14 @@
     }
   }
 
-  // CSS's own column-balancing ("as many columns as fit, up to the max, balanced by
-  // content") can under-use columns — e.g. settle for 2 wide ones when a 3rd would've
-  // fit and left everything roomier. So instead of leaving that to the browser, work out
-  // exactly how many SONG_COL_MIN_WIDTH-or-wider columns actually fit in the available
-  // space and force that count directly. Runs on every render (and again from
-  // fitSongToViewport on resize/rotate), so a song always uses every column it can.
-  var SONG_COL_MIN_WIDTH = 300;
-  var SONG_COL_MAX = 4;
-  // Each .song-section has break-inside:avoid, so a section can only ever occupy one
-  // column — asking for more columns than there are sections just reserves empty columns
-  // that shrink the populated ones for no benefit (e.g. a 1 verse + 1 chorus song getting
-  // squeezed into 2 of 3 available columns, leaving the 3rd blank and wasting width that
-  // the 2 real columns could've used). Counts the same way parseAndRenderContent does: the
-  // first "## " header opens a section, and any content before the first header opens one
-  // implicit section too.
-  function countSongSections(content){
-    var lines = String(content||"").split("\n");
-    var count = 0;
-    var sectionOpen = false;
-    for(var i=0;i<lines.length;i++){
-      if(/^##\s+/.test(lines[i])){
-        count++;
-        sectionOpen = true;
-      } else if(!sectionOpen && lines[i].trim() !== ""){
-        count++;
-        sectionOpen = true;
-      }
-    }
-    return Math.max(1, count);
-  }
+  // Sections size themselves and wrap naturally (see the .song-content/.song-section CSS
+  // and markRowDividers) — there's no column count to compute. The only thing left for the
+  // "Columns" setting to control is the manual "Single column" override, which forces every
+  // section onto its own row regardless of how much width is available.
   function applyColumnSetting(){
     var el = document.querySelector(".song-content");
     if(!el) return;
-    if(UISTATE.columns === "1"){
-      el.style.columnWidth = "auto";
-      el.style.columnCount = "1";
-      return;
-    }
-    var container = el.closest(".song-fit-outer") || el.parentElement;
-    var availW = container ? container.clientWidth : 0;
-    if(!availW){ el.style.columnWidth = ""; el.style.columnCount = ""; return; }
-    var gap = parseFloat(getComputedStyle(el).columnGap) || 48;
-    var widthCount = Math.max(1, Math.min(SONG_COL_MAX, Math.floor((availW + gap) / (SONG_COL_MIN_WIDTH + gap))));
-    var song = (DB.ui.view === "song") ? findSong(DB.ui.currentSongId) : null;
-    var sectionCount = song ? countSongSections(song.content) : SONG_COL_MAX;
-    var count = Math.max(1, Math.min(widthCount, sectionCount));
-    el.style.columnWidth = "auto";
-    el.style.columnCount = String(count);
+    el.classList.toggle("single-column", UISTATE.columns === "1");
   }
 
   /* ============ SPACE / SYNC ============ */
