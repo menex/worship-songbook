@@ -406,11 +406,14 @@
     });
   }
 
-  // Landscape "fit to screen": scale the whole song down (or up, capped) so it's fully
-  // visible with no scrolling — the point of a tablet propped on a stand during a set.
-  // Portrait keeps the normal scrollable multi-column layout untouched.
+  // Landscape "fit to screen": scale the whole song down OR UP so it always fills the
+  // available space with no scrolling — the point of a tablet propped on a stand during a
+  // set. A short song (e.g. one verse + one chorus) should look intentional, filling the
+  // screen at a large, easy-to-read size, not sit small in a corner. FIT_MAX_SCALE is a
+  // safety ceiling only (guards against a one-line song blowing up to absurd size), not a
+  // "never enlarge" cap. Portrait keeps the normal scrollable multi-column layout untouched.
   var FIT_MIN_SCALE = 0.5;
-  var FIT_MAX_SCALE = 1;
+  var FIT_MAX_SCALE = 3;
   function isLandscapeOrientation(){
     try{
       if(window.matchMedia){ return window.matchMedia("(orientation: landscape)").matches; }
@@ -420,6 +423,7 @@
   function fitSongToViewport(){
     var outer = document.querySelector(".song-fit-outer");
     var inner = document.querySelector(".song-fit-inner");
+    var contentEl = document.querySelector(".song-content");
     if(!outer || !inner) return;
     if(DB.ui.view !== "song" || !isLandscapeOrientation()){
       inner.style.position = "";
@@ -430,16 +434,35 @@
       outer.style.overflow = "";
       return;
     }
+    var availW = outer.clientWidth;
+    var availH = outer.clientHeight;
+    if(!availW || !availH) return;
     // Measure the song's natural (unscaled) size in normal document flow first, with an
     // explicit pixel width locked in — an absolutely positioned box with width:auto can
     // shrink-to-fit differently than the flowed box we're about to measure, which would
     // throw off the CSS column layout's width and make the scale calculation wrong.
-    var availW = outer.clientWidth;
-    var availH = outer.clientHeight;
-    if(!availW || !availH) return;
+    //
+    // Measuring at the FULL available width would make naturalW trivially equal availW
+    // every time (the columns box always stretches to fill whatever width it's given),
+    // which forces the width-based scale ratio (availW/naturalW) to always be exactly 1 —
+    // silently capping the whole fit at 100% no matter how much taller the viewport is
+    // than the content, which is why a short song (one verse + one chorus) used to sit
+    // small instead of filling the screen. Measuring instead at the columns' natural
+    // MINIMUM comfortable width (SONG_COL_MIN_WIDTH per column, from applyColumnSetting)
+    // gives a true "how much room does this content actually need" box, so scaling it up
+    // to fill availW/availH is a real enlargement, not a no-op.
+    var colCount = (contentEl && parseInt(contentEl.style.columnCount, 10)) || 1;
+    var measureW = availW;
+    if(contentEl){
+      var contentCS = getComputedStyle(contentEl);
+      var gap = parseFloat(contentCS.columnGap) || 48;
+      var hPad = (parseFloat(contentCS.paddingLeft) || 0) + (parseFloat(contentCS.paddingRight) || 0);
+      var idealW = colCount * SONG_COL_MIN_WIDTH + (colCount - 1) * gap + hPad;
+      measureW = Math.min(idealW, availW);
+    }
     inner.style.position = "static";
     inner.style.transform = "none";
-    inner.style.width = availW + "px";
+    inner.style.width = measureW + "px";
     var naturalW = inner.scrollWidth;
     var naturalH = inner.scrollHeight;
     if(!naturalW || !naturalH) return;
@@ -593,7 +616,10 @@
     var t = line.trim();
     if(!t) return false;
     if(isChordLine(line)) return false;
-    return /^[A-ZÀ-Ý0-9][A-ZÀ-Ý0-9\s]*:$/.test(t);
+    // Trailing colon ("CORO:") is the classic form, but a bare all-caps section name on
+    // its own line ("VERSO", "CORO", "PUENTE") is just as common in real chord sheets and
+    // means the same thing — treat the colon as optional rather than requiring it.
+    return /^[A-ZÀ-Ý0-9][A-ZÀ-Ý0-9\s]*:?$/.test(t);
   }
   // Keeps saved song content tidy regardless of how it got typed/pasted/edited: no blank
   // line directly under a "## Section" header (renders as dead space at the top of the
@@ -1426,6 +1452,28 @@
   // fitSongToViewport on resize/rotate), so a song always uses every column it can.
   var SONG_COL_MIN_WIDTH = 300;
   var SONG_COL_MAX = 4;
+  // Each .song-section has break-inside:avoid, so a section can only ever occupy one
+  // column — asking for more columns than there are sections just reserves empty columns
+  // that shrink the populated ones for no benefit (e.g. a 1 verse + 1 chorus song getting
+  // squeezed into 2 of 3 available columns, leaving the 3rd blank and wasting width that
+  // the 2 real columns could've used). Counts the same way parseAndRenderContent does: the
+  // first "## " header opens a section, and any content before the first header opens one
+  // implicit section too.
+  function countSongSections(content){
+    var lines = String(content||"").split("\n");
+    var count = 0;
+    var sectionOpen = false;
+    for(var i=0;i<lines.length;i++){
+      if(/^##\s+/.test(lines[i])){
+        count++;
+        sectionOpen = true;
+      } else if(!sectionOpen && lines[i].trim() !== ""){
+        count++;
+        sectionOpen = true;
+      }
+    }
+    return Math.max(1, count);
+  }
   function applyColumnSetting(){
     var el = document.querySelector(".song-content");
     if(!el) return;
@@ -1438,7 +1486,10 @@
     var availW = container ? container.clientWidth : 0;
     if(!availW){ el.style.columnWidth = ""; el.style.columnCount = ""; return; }
     var gap = parseFloat(getComputedStyle(el).columnGap) || 48;
-    var count = Math.max(1, Math.min(SONG_COL_MAX, Math.floor((availW + gap) / (SONG_COL_MIN_WIDTH + gap))));
+    var widthCount = Math.max(1, Math.min(SONG_COL_MAX, Math.floor((availW + gap) / (SONG_COL_MIN_WIDTH + gap))));
+    var song = (DB.ui.view === "song") ? findSong(DB.ui.currentSongId) : null;
+    var sectionCount = song ? countSongSections(song.content) : SONG_COL_MAX;
+    var count = Math.max(1, Math.min(widthCount, sectionCount));
     el.style.columnWidth = "auto";
     el.style.columnCount = String(count);
   }
