@@ -173,6 +173,8 @@
   }
   .edit-hint{font-size:12.5px;color:var(--muted);background:var(--surface-alt);border-radius:8px;padding:10px 14px;}
   .edit-hint code{background:var(--surface-hover);padding:1px 5px;border-radius:4px;}
+  .edit-file-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .edit-file-hint{font-size:12px;color:var(--muted);}
   .edit-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border);}
   .edit-footer .left-actions label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);}
   .edit-footer .right-actions{display:flex;gap:10px;}
@@ -1029,8 +1031,12 @@
       '</div>'+
       '<div class="edit-body">'+
         (song.format === "chords"
-          ? '<div class="edit-hint">Put each chord on its own line, positioned above the syllable it plays on — just like a normal chord chart. Start a section with <code>## Verse 1</code>. Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>. Paste a chord sheet from anywhere and it\'ll line up automatically.</div>'
-          : '<div class="edit-hint">Start a line with <code>## </code> for a section title (e.g. <code>## Verse 1</code>). Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>.</div>')+
+          ? '<div class="edit-hint">Put each chord on its own line, positioned above the syllable it plays on — just like a normal chord chart. Start a section with <code>## Verse 1</code>. Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>. Paste a chord sheet from anywhere and it\'ll line up automatically, or upload a .txt file below for the most reliable spacing.</div>'
+          : '<div class="edit-hint">Start a line with <code>## </code> for a section title (e.g. <code>## Verse 1</code>). Wrap text in <code>**double asterisks**</code> to make it <strong>bold</strong>. You can also upload a .txt file below.</div>')+
+        '<div class="edit-file-row">'+
+          '<input type="file" id="song-file-input" accept=".txt,.md,text/plain" style="font-size:13.5px;">'+
+          '<span class="edit-file-hint">Uploading replaces the text below with the file\'s exact contents — the most reliable way to keep chord/lyric spacing intact.</span>'+
+        '</div>'+
         '<textarea data-field="content" spellcheck="false">'+escapeHtml(song.format === "chords" ? bracketsToChordOverLyric(song.content) : song.content)+'</textarea>'+
       '</div>'+
       '<div class="edit-footer">'+
@@ -1961,6 +1967,25 @@
         render();
       };
       reader.readAsText(file);
+      return;
+    }
+    if(e.target.id === "song-file-input"){
+      var songFile = e.target.files && e.target.files[0];
+      if(!songFile) return;
+      var fileInputEl = e.target;
+      var origFileLabel = fileInputEl.nextElementSibling ? fileInputEl.nextElementSibling.textContent : "";
+      var songReader = new FileReader();
+      songReader.onload = function(){
+        var contentTa = document.querySelector('textarea[data-field="content"]');
+        if(contentTa){ contentTa.value = String(songReader.result || ""); }
+      };
+      songReader.onerror = function(){
+        if(fileInputEl.nextElementSibling){ fileInputEl.nextElementSibling.textContent = "Couldn't read that file — try again or paste the text instead."; }
+        setTimeout(function(){
+          if(fileInputEl.nextElementSibling){ fileInputEl.nextElementSibling.textContent = origFileLabel; }
+        }, 4000);
+      };
+      songReader.readAsText(songFile);
     }
   });
 
